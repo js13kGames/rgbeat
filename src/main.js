@@ -1,11 +1,14 @@
 /**
  * RGBeat -- entry point.
  *
- * Phase 0 scaffold: canvas setup, a fixed-timestep game loop, and a placeholder
- * frame so the whole pipeline (bundle -> minify -> inline -> zip -> size check)
- * can be verified before any gameplay exists. Phase 1 replaces the placeholder
- * with the real world renderer.
+ * Owns the canvas, the fixed-timestep loop, and the order systems run in.
+ * Gameplay lives in the modules it pulls together.
  */
+import { held, pressed, endFrame } from './input.js';
+import { player, updatePlayer, drawPlayer, resetPlayer } from './player.js';
+import { camera, updateCamera, applyCamera } from './camera.js';
+import { level, drawWorld } from './world.js';
+import { updateJitter } from './render.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -16,11 +19,16 @@ const MAX_FRAME_TIME = 0.25;
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-/** Device-pixel-aware sizing, recomputed on resize. */
+/** CSS-pixel viewport size, kept in sync with the window. */
+let viewW = 0;
+let viewH = 0;
+
 function resize() {
   const dpr = Math.min(devicePixelRatio || 1, 2);
-  canvas.width = innerWidth * dpr;
-  canvas.height = innerHeight * dpr;
+  viewW = innerWidth;
+  viewH = innerHeight;
+  canvas.width = viewW * dpr;
+  canvas.height = viewH * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
@@ -31,27 +39,35 @@ let elapsed = 0;
 
 function update(dt) {
   elapsed += dt;
+  updateJitter(elapsed);
+
+  // Movement intent. The combo system will suppress `move` while aiming
+  // (GDD Section 3.1) -- that hook lands with the combo grammar in the next
+  // phase; for now the arrows always drive movement.
+  const intent = {
+    move: (held.right ? 1 : 0) - (held.left ? 1 : 0),
+    jumpHeld: held.up,
+    jumpPressed: !!pressed.up,
+  };
+
+  updatePlayer(dt, intent);
+
+  // Falling out of the level. Full health handling arrives with Section 5;
+  // for now this just prevents an endless fall.
+  if (player.y > level.killY) resetPlayer();
+
+  updateCamera(dt, player, viewW, viewH);
 }
 
 function render() {
-  const w = innerWidth;
-  const h = innerHeight;
+  ctx.save();
+  applyCamera(ctx);
 
-  ctx.fillStyle = '#0a0a0c';
-  ctx.fillRect(0, 0, w, h);
+  const view = { x: camera.x, y: camera.y, w: viewW, h: viewH };
+  drawWorld(ctx, view);
+  drawPlayer(ctx);
 
-  // Placeholder: the one saturated thing on screen, pulsing. Stands in for the
-  // player until Phase 1 -- present purely to prove the loop and build work.
-  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2);
-  ctx.fillStyle = 'hsl(' + ((elapsed * 60) % 360) + ',90%,60%)';
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2, 20 + pulse * 10, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#666';
-  ctx.font = '14px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('RGBeat -- phase 0 scaffold', w / 2, h / 2 + 60);
+  ctx.restore();
 }
 
 let last = performance.now();
@@ -66,6 +82,7 @@ function frame(now) {
   while (accumulator >= STEP) {
     update(STEP);
     accumulator -= STEP;
+    endFrame();
   }
 
   render();
