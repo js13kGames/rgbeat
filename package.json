@@ -1,0 +1,22 @@
+{
+  "name": "rgbeat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RGBeat - js13kGames 2026 entry (theme: Unicorns and Rainbows)",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node tools/build.mjs --dev",
+    "build": "node tools/build.mjs",
+    "build:roadroller": "node tools/build.mjs --roadroller",
+    "size": "node tools/size.mjs",
+    "clean": "node tools/clean.mjs",
+    "preview": "node tools/build.mjs --preview"
+  },
+  "devDependencies": {
+    "@gfx/zopfli": "^1.0.15",
+    "esbuild": "^0.25.0",
+    "roadroller": "^2.1.0",
+    "terser": "^5.36.0"
+  }
+}
