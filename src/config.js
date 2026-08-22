@@ -55,3 +55,33 @@ export const INK = {
   /** Ink spatter dots per terrain edge segment. */
   spatter: 3,
 };
+
+// --- Combo grammar (GDD Sections 3.1 and 4.2) -------------------------------
+/**
+ * How long the player has to press the second key after arming a combo.
+ * Section 15 recommends starting at 700ms and tuning by feel.
+ */
+export const AIM_WINDOW = 0.7;
+
+/**
+ * Per-key cooldown. Uniform across Q/W/E for now, per the Section 15
+ * recommendation; the table shape allows diverging them if balance needs it.
+ *
+ * Section 4.2 sets a hard constraint on this value: the player must reliably
+ * land at least one valid hit inside every boss weak-colour window. That check
+ * happens when the boss lands, and this number is expected to move then.
+ */
+export const COOLDOWN = { q: 1.8, w: 1.8, e: 1.8 };
+
+/** Reach of each mechanic archetype, in px. */
+export const ABILITY_RANGE = {
+  guard: 95, // nova radius, centred on the player
+  assault: 130, // dash-strike length
+  flow: 150, // arc sweep radius
+};
+
+/** How long an ability's visual effect lives, in seconds. */
+export const EFFECT_LIFETIME = 0.32;
+
+/** Forward impulse applied to the player by Assault (dash) abilities. */
+export const DASH_IMPULSE = 460;
