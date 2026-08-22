@@ -9,21 +9,43 @@
 // --- Movement (GDD Section 3.1) ---------------------------------------------
 // Chosen to feel responsive at platformer speed, since combat is meant to be a
 // puzzle played *at speed* (Section 2, pillar 2) rather than from a standstill.
-export const GRAVITY = 1800; // px/s^2
-export const MOVE_SPEED = 260; // px/s, horizontal run speed
+//
+// These three values define the JUMP ENVELOPE that all level geometry must be
+// authored against:
+//
+//   max height   = JUMP_VELOCITY^2 / (2 * GRAVITY)      = 144 px
+//   airtime      = 2 * |JUMP_VELOCITY| / GRAVITY        = 0.82 s
+//   max distance = MOVE_SPEED * airtime                 = 231 px
+//
+// Both figures are theoretical maxima: they assume a perfect apex landing and
+// full run speed at takeoff. Level geometry therefore targets a fraction of
+// them, not the numbers themselves -- see LEDGE_STEP_MAX / GAP_MAX below.
+// `npm run check:level` enforces this, because an unreachable ledge is not
+// visible from reading the level table.
+export const GRAVITY = 1700; // px/s^2
+export const MOVE_SPEED = 280; // px/s, horizontal run speed
 export const ACCEL = 2600; // px/s^2, ground acceleration
 export const AIR_ACCEL = 1400; // px/s^2, reduced air control
 export const FRICTION = 2400; // px/s^2, ground deceleration when not steering
-export const JUMP_VELOCITY = -620; // px/s, initial jump impulse
+export const JUMP_VELOCITY = -700; // px/s, initial jump impulse
 export const MAX_FALL_SPEED = 1100; // px/s, terminal velocity
+
+/**
+ * Authoring limits for level geometry, as a fraction of the envelope above.
+ * A jump that needs more than ~70% of the theoretical maximum reads as
+ * "pixel-perfect" to a player, which is not the feel we want outside of
+ * deliberate challenge sections.
+ */
+export const LEDGE_STEP_MAX = 105; // px of vertical rise between surfaces (73%)
+export const GAP_MAX = 150; // px of horizontal gap to clear (65%)
 
 /**
  * Forgiveness windows. Both are standard platformer feel aids and cheap in
  * bytes: they matter here because the combo system takes the arrow keys away
  * mid-platforming (Section 3.1), so movement must feel generous.
  */
-export const COYOTE_TIME = 0.09; // s of grace to still jump after leaving ground
-export const JUMP_BUFFER = 0.12; // s of grace to queue a jump before landing
+export const COYOTE_TIME = 0.11; // s of grace to still jump after leaving ground
+export const JUMP_BUFFER = 0.14; // s of grace to queue a jump before landing
 /** Releasing jump early cuts upward velocity, giving variable jump height. */
 export const JUMP_CUT_MULTIPLIER = 0.45;
 

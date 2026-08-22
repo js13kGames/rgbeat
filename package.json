@@ -11,7 +11,8 @@
     "build:roadroller": "node tools/build.mjs --roadroller",
     "size": "node tools/size.mjs",
     "clean": "node tools/clean.mjs",
-    "preview": "node tools/build.mjs --preview"
+    "preview": "node tools/build.mjs --preview",
+    "check:level": "node tools/check-level.mjs"
   },
   "devDependencies": {
     "@gfx/zopfli": "^1.0.15",

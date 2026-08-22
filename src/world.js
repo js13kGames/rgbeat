@@ -28,22 +28,39 @@ const LEVEL = {
   /** Y of the death plane; falling past this counts as a hazard (Section 5). */
   killY: 1100,
   spawn: { x: 120, y: 500 },
+  /**
+   * Every surface here is authored against the jump envelope in config.js:
+   * no rise exceeds LEDGE_STEP_MAX and no gap exceeds GAP_MAX, both of which
+   * sit well under the theoretical maximum so jumps never feel pixel-perfect.
+   * `npm run check:level` verifies this; do not add geometry by eye.
+   */
   solids: [
-    // Ground, broken by two gaps the player must jump.
-    { x: 0, y: 640, w: 620, h: 260 },
-    { x: 760, y: 640, w: 540, h: 260 },
-    { x: 1450, y: 640, w: 1750, h: 260 },
-    // Ledges.
-    { x: 340, y: 520, w: 160, h: 24 },
-    { x: 620, y: 430, w: 150, h: 24 },
-    { x: 980, y: 470, w: 170, h: 24 },
-    { x: 1240, y: 360, w: 150, h: 24 },
-    { x: 1560, y: 500, w: 200, h: 24 },
-    { x: 1880, y: 400, w: 180, h: 24 },
-    { x: 2180, y: 520, w: 220, h: 24 },
-    { x: 2520, y: 420, w: 200, h: 24 },
-    // A wall to break up the silhouette near the level's end.
-    { x: 2860, y: 400, w: 40, h: 240 },
+    // Ground, broken by two gaps the player must jump (130 px and 140 px).
+    { x: 0, y: 640, w: 600, h: 260 },
+    { x: 730, y: 640, w: 550, h: 260 },
+    { x: 1420, y: 640, w: 1780, h: 260 },
+
+    // Ledges. Each rises at most ~100 px from the surface below it.
+    //
+    // Critically, NONE of them sits above the run-up to a pit. A ledge over a
+    // gap approach becomes a ceiling that clips the jump arc, which is what
+    // turns an ordinary gap into a pixel-perfect one -- the clearance is
+    // enforced by `npm run check:level`, not left to judgement.
+    { x: 200, y: 548, w: 160, h: 24 }, // +92 from ground
+
+    { x: 900, y: 545, w: 160, h: 24 }, // +95 from ground
+    { x: 980, y: 455, w: 140, h: 24 }, // +90
+
+    { x: 1600, y: 545, w: 180, h: 24 }, // +95 from ground
+    { x: 1880, y: 455, w: 170, h: 24 }, // +90
+    { x: 2200, y: 545, w: 190, h: 24 }, // +95 from ground
+    { x: 2470, y: 455, w: 170, h: 24 }, // +90
+    { x: 2800, y: 540, w: 180, h: 24 }, // +100 from ground
+
+    // A low wall to break up the silhouette near the level's end. `decor` marks
+    // it as an obstacle rather than part of the route, so the reachability
+    // check does not demand that the player be able to land on top of it.
+    { x: 3040, y: 545, w: 40, h: 95, decor: 1 },
   ],
 };
 
