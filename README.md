@@ -20,10 +20,33 @@ single source of truth for mechanics, combat, audio, accessibility and scope.
 | **← ↑ → ↓** *(while a combo is armed)* | Aim. Movement is suspended; releasing without a second key cancels harmlessly. |
 | **R** | Ultimate — a full-spectrum explosion that ignores colour matching. Needs a full bar. |
 | **M** | Mute / unmute all audio. |
+| **C** | Cycle colourblind palette (default → protanopia → deuteranopia → tritanopia). Saved between sessions. |
 
 Each of Q, W and E has its own cooldown. A pure combo (`Q→Q`) spends one; a mixed
 combo (`Q→W`) spends both, which is what makes secondary colours more expensive to
 chain. See GDD Sections 4 and 4.2.
+
+### Touch
+
+Touch controls appear automatically on coarse-pointer devices. Drag the left-hand
+zone to run, flick it upward to jump, and tap the three buttons on the right to build
+combos — while a combo is armed, that same drag zone becomes the aim stick, exactly as
+the arrow keys do. Tap the ultimate bar to fire the ultimate.
+
+Touch and keyboard write into the same input state, so the combo grammar has one
+implementation rather than two.
+
+### Accessibility
+
+Every hit-colour has its own **shape** as well as its own hue — triangle, square,
+circle, inverted triangle, plus, cross — drawn on enemy cores, the boss's colour ring,
+ability effects and the HUD. The game stays readable with colour distinction disabled
+entirely.
+
+The palette is a single object swapped wholesale at runtime, so a mode change reaches
+every draw call at once. The chosen mode persists in `localStorage` under the
+namespaced key `rgbeat_colorblindMode`; `localStorage.clear()` is never called, per the
+jam's shared-origin rule. See GDD Section 10.
 
 ---
 

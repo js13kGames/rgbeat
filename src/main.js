@@ -70,8 +70,9 @@ import {
   setMusicTheme,
   updateMusic,
 } from './audio.js';
-import { HIT_COLORS } from './palette.js';
-import { drawHud, drawComboIndicator } from './hud.js';
+import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
+import { drawHud, drawComboIndicator, showToast } from './hud.js';
+import { initTouch } from './touch.js';
 import { DASH_IMPULSE } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
@@ -101,6 +102,8 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 initAudio();
+loadPaletteMode();
+initTouch(canvas, () => ({ w: viewW, h: viewH }));
 
 let elapsed = 0;
 
@@ -108,6 +111,9 @@ let elapsed = 0;
 let wasArmed = false;
 
 startLevel();
+// Neither accessibility nor audio settings have an on-screen control, so the
+// opening hint is the only thing that makes them discoverable.
+showToast('C: colourblind palette    M: sound', 0, 6);
 
 function startLevel() {
   revivePlayer();
@@ -151,7 +157,8 @@ function update(dt) {
 
   if (fired) onAbilityFired(fired);
 
-  if (pressed.mute) toggleMute();
+  if (pressed.mute) showToast(toggleMute() ? 'sound on' : 'sound off', elapsed);
+  if (pressed.palette) showToast('palette: ' + cyclePaletteMode(), elapsed);
 
   // The ultimate sits outside the combo grammar entirely: its own key, its own
   // resource, and explicitly unaffected by the per-key cooldowns (Section 4.3).

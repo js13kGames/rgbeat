@@ -34,7 +34,7 @@ import {
 import { palette, HIT_COLORS } from './palette.js';
 import { level } from './world.js';
 import { effects, effectOverlaps } from './effects.js';
-import { inkRect, mixColor } from './render.js';
+import { inkRect, mixColor, drawGlyph } from './render.js';
 
 export const boss = {
   x: 0,
@@ -270,13 +270,9 @@ function drawColorRing(ctx, cx, cy) {
       ctx.fillStyle = palette[color];
     }
 
-    const size = isWeak ? 7 : 5;
-    ctx.beginPath();
-    ctx.moveTo(0, -size);
-    ctx.lineTo(size, 0);
-    ctx.lineTo(0, size);
-    ctx.lineTo(-size, 0);
-    ctx.closePath();
+    // Glyph rather than a shared diamond: the ring has to be readable as six
+    // distinct colours without relying on hue at all (Section 10).
+    drawGlyph(ctx, i, isWeak ? 7 : 5.5);
     ctx.fill();
     ctx.restore();
   }
@@ -293,25 +289,16 @@ function drawWeakCore(ctx, cx, cy) {
   ctx.shadowColor = color;
   ctx.shadowBlur = hurt ? 30 : 20;
 
+  const index = HIT_COLORS.indexOf(boss.weak);
+
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, -size);
-  ctx.lineTo(size, 0);
-  ctx.lineTo(0, size);
-  ctx.lineTo(-size, 0);
-  ctx.closePath();
+  drawGlyph(ctx, index, size);
   ctx.fill();
 
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.9;
   ctx.fillStyle = '#fff';
-  const inner = size * 0.32;
-  ctx.beginPath();
-  ctx.moveTo(0, -inner);
-  ctx.lineTo(inner, 0);
-  ctx.lineTo(0, inner);
-  ctx.lineTo(-inner, 0);
-  ctx.closePath();
+  drawGlyph(ctx, index, size * 0.34);
   ctx.fill();
 
   ctx.restore();

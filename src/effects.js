@@ -16,6 +16,7 @@
  */
 import { ABILITY_RANGE, EFFECT_LIFETIME, ULTIMATE_RADIUS, ULTIMATE_LIFETIME } from './config.js';
 import { palette, rainbow, HIT_COLORS } from './palette.js';
+import { drawGlyph } from './render.js';
 
 /** Live effects. Short-lived; the array stays tiny. */
 export const effects = [];
@@ -145,11 +146,42 @@ function drawEffect(ctx, effect) {
   // into a world that lost it, not like paint sitting on top.
   ctx.globalCompositeOperation = 'lighter';
 
-  if (effect.ultimate) drawUltimate(ctx, t);
-  else if (effect.archetype === 'guard') drawGuard(ctx, t, color);
-  else if (effect.archetype === 'assault') drawAssault(ctx, t, color, effect);
-  else drawFlow(ctx, t, color, effect);
+  if (effect.ultimate) {
+    drawUltimate(ctx, t);
+  } else if (effect.archetype === 'guard') {
+    drawGuard(ctx, t, color);
+    drawEffectGlyph(ctx, effect, t, color);
+  } else if (effect.archetype === 'assault') {
+    drawAssault(ctx, t, color, effect);
+    drawEffectGlyph(ctx, effect, t, color);
+  } else {
+    drawFlow(ctx, t, color, effect);
+    drawEffectGlyph(ctx, effect, t, color);
+  }
 
+  ctx.restore();
+}
+
+/**
+ * The output colour's glyph, riding along the effect (GDD Section 10).
+ *
+ * Ability effects need the same hue-independent readback as enemy cores: the
+ * player has to be able to confirm which colour they actually just fired,
+ * especially while learning that the second key -- not the first -- picks it.
+ */
+function drawEffectGlyph(ctx, effect, t, color) {
+  const index = HIT_COLORS.indexOf(effect.color);
+  if (index < 0) return;
+
+  // Rides outward along the aim, so it sits on the strike rather than on the
+  // player, and grows as the effect expands.
+  const reach = ABILITY_RANGE[effect.archetype] * 0.45 * (0.4 + t);
+  ctx.save();
+  ctx.translate(effect.aimX * reach, effect.aimY * reach);
+  ctx.globalAlpha = (1 - t) * 0.9;
+  ctx.fillStyle = color;
+  drawGlyph(ctx, index, 7 + t * 3);
+  ctx.fill();
   ctx.restore();
 }
 

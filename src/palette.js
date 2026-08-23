@@ -55,6 +55,16 @@ const MODES = {
     purple: '#b44dff',
     cyan: '#1fe0e0',
   },
+  // Protanopia: reds read as very dark, so the "red" slot moves to amber and
+  // the warm pair is separated by lightness as much as by hue.
+  protanopia: {
+    red: '#e69f00',
+    green: '#009e73',
+    blue: '#0072b2',
+    orange: '#f0e442',
+    purple: '#cc79a7',
+    cyan: '#56b4e9',
+  },
   // Okabe-Ito derived: avoids the red/green confusion axis.
   deuteranopia: {
     red: '#d55e00',
@@ -117,6 +127,41 @@ export function setPaletteMode(mode) {
   if (!MODES[mode]) return;
   paletteMode = mode;
   Object.assign(palette, MODES[mode]);
+}
+
+/**
+ * Namespaced per the competition's shared-origin "be neighbourly" rule
+ * (Section 10). Other jam entries live on the same origin, so every key we
+ * touch is prefixed -- and `localStorage.clear()` is never called anywhere.
+ */
+const STORAGE_KEY = 'rgbeat_colorblindMode';
+
+/**
+ * Restore the saved mode, if any.
+ *
+ * All storage access is wrapped: localStorage throws outright in some privacy
+ * modes, and an unhandled failure here would both break startup and dirty a
+ * console the jam requires clean. A missing preference is not an error.
+ */
+export function loadPaletteMode() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) setPaletteMode(saved);
+  } catch (e) {
+    /* storage unavailable; the default palette is a fine fallback */
+  }
+}
+
+/** Advance to the next mode and persist it. Returns the new mode's name. */
+export function cyclePaletteMode() {
+  const next = PALETTE_MODES[(PALETTE_MODES.indexOf(paletteMode) + 1) % PALETTE_MODES.length];
+  setPaletteMode(next);
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch (e) {
+    /* preference simply will not persist */
+  }
+  return next;
 }
 
 /**

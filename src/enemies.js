@@ -23,9 +23,9 @@ import {
   ENEMY_HURT_FLASH,
   INK,
 } from './config.js';
-import { palette, MIX, RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
+import { palette, MIX, HIT_COLORS, RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
 import { effects, effectOverlaps } from './effects.js';
-import { inkRect, mixColor } from './render.js';
+import { inkRect, mixColor, drawGlyph } from './render.js';
 import { restorationAmount } from './world.js';
 
 /**
@@ -264,9 +264,10 @@ function drawEnemy(ctx, e, t) {
  * the accessibility phase.
  */
 function drawCore(ctx, x, y, enemy) {
+  const index = HIT_COLORS.indexOf(enemy.core);
   const color = palette[enemy.core];
   const hurt = enemy.flash > 0;
-  const size = hurt ? 9 : 7.5;
+  const size = hurt ? 9.5 : 8;
 
   ctx.save();
   ctx.translate(x, y);
@@ -274,27 +275,17 @@ function drawCore(ctx, x, y, enemy) {
   ctx.shadowColor = color;
   ctx.shadowBlur = hurt ? 22 : 14;
 
-  // Outer diamond.
+  // The core's SHAPE is the requirement as much as its colour (Section 10):
+  // a player who cannot separate two hues can still read which glyph this is.
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, -size);
-  ctx.lineTo(size, 0);
-  ctx.lineTo(0, size);
-  ctx.lineTo(-size, 0);
-  ctx.closePath();
+  drawGlyph(ctx, index, size);
   ctx.fill();
 
   // Inner highlight, which makes the core read as lit rather than painted.
   ctx.shadowBlur = 0;
-  ctx.globalAlpha = 0.85;
+  ctx.globalAlpha = 0.8;
   ctx.fillStyle = '#fff';
-  const inner = size * 0.34;
-  ctx.beginPath();
-  ctx.moveTo(0, -inner);
-  ctx.lineTo(inner, 0);
-  ctx.lineTo(0, inner);
-  ctx.lineTo(-inner, 0);
-  ctx.closePath();
+  drawGlyph(ctx, index, size * 0.36);
   ctx.fill();
 
   ctx.restore();

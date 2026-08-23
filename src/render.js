@@ -107,3 +107,66 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, rad);
   ctx.closePath();
 }
+
+// --- Colour glyphs (GDD Section 10) -----------------------------------------
+/**
+ * A distinct shape per hit-colour, drawn on every core and every ability
+ * effect.
+ *
+ * This is the half of the accessibility story that palettes cannot cover: a
+ * player who cannot distinguish two hues, or who has disabled colour
+ * distinction entirely, still needs to read a core. Shape is independent of
+ * hue, so it works in every palette mode and in edge cases none of them fit.
+ *
+ * The six shapes are chosen to stay distinguishable at small size, which rules
+ * out a family of regular polygons -- a pentagon, hexagon and octagon are one
+ * blurry circle at 8px. Opposed pairs (triangle up/down, plus/cross) read far
+ * more reliably.
+ *
+ * Index order matches HIT_COLORS: red, green, blue, orange, purple, cyan.
+ */
+export function drawGlyph(ctx, index, size) {
+  ctx.beginPath();
+
+  switch (index) {
+    case 0: // red -- triangle, pointing up
+      polygon(ctx, 3, size, -Math.PI / 2);
+      break;
+    case 1: // green -- square
+      polygon(ctx, 4, size, Math.PI / 4);
+      break;
+    case 2: // blue -- circle
+      ctx.arc(0, 0, size * 0.82, 0, Math.PI * 2);
+      break;
+    case 3: // orange -- triangle, pointing down
+      polygon(ctx, 3, size, Math.PI / 2);
+      break;
+    case 4: // purple -- plus
+      bar(ctx, size, size * 0.36);
+      break;
+    default: // cyan -- diagonal cross
+      ctx.save();
+      ctx.rotate(Math.PI / 4);
+      bar(ctx, size, size * 0.36);
+      ctx.restore();
+      break;
+  }
+}
+
+/** Regular polygon path centred on the origin. */
+function polygon(ctx, sides, radius, rotation) {
+  for (let i = 0; i < sides; i++) {
+    const a = rotation + (i / sides) * Math.PI * 2;
+    const x = Math.cos(a) * radius;
+    const y = Math.sin(a) * radius;
+    if (i) ctx.lineTo(x, y);
+    else ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+}
+
+/** Two crossed bars, forming a plus. Rotated 45 degrees it becomes an X. */
+function bar(ctx, size, thickness) {
+  ctx.rect(-size, -thickness, size * 2, thickness * 2);
+  ctx.rect(-thickness, -size, thickness * 2, size * 2);
+}

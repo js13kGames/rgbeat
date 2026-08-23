@@ -13,12 +13,14 @@
  * The visual language (ring, diamond core glyph, key cap below) is taken from
  * docs/reference/UI.png, translated into flat procedural shapes.
  */
-import { palette, rainbow } from './palette.js';
+import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';
 import { AIM_WINDOW, MAX_HEARTS, BOSS_MAX_HP } from './config.js';
 import { player } from './player.js';
 import { ultimate, isUltimateReady } from './ultimate.js';
 import { boss, bossActive, windowProgress, isTelegraphing } from './boss.js';
+import { drawGlyph } from './render.js';
+import { isTouch } from './touch.js';
 
 /** Which colour each key shows on its HUD button (its base colour, Section 4). */
 const KEY_COLOR = { q: 'blue', w: 'red', e: 'green' };
@@ -27,21 +29,55 @@ const BUTTON_RADIUS = 26;
 const BUTTON_GAP = 78;
 const BUTTON_BOTTOM_MARGIN = 58;
 
+/** Touch buttons are bigger: a 26px radius is below a comfortable tap target. */
+const TOUCH_BUTTON_RADIUS = 34;
+
+/**
+ * The ultimate bar's rectangle. Exported so touch can use it as a tap target:
+ * the ultimate is the one action with no button of its own, and on touch there
+ * is no R key to fall back on.
+ */
+export const ULT_BAR = { x: 22, y: 52, w: 150, h: 9 };
+
+export function buttonRadius() {
+  return isTouch() ? TOUCH_BUTTON_RADIUS : BUTTON_RADIUS;
+}
+
+/**
+ * Screen position of ability button `i`.
+ *
+ * Shared by drawing and by touch hit-testing, so the visible button and its
+ * tap target can never drift apart.
+ *
+ * On touch the three buttons move to the lower right and stack into an arc,
+ * per Section 3.2 -- thumb-reachable, and clear of the left-hand movement zone.
+ */
+export function abilityButtonPos(i, viewW, viewH) {
+  if (isTouch()) {
+    const r = TOUCH_BUTTON_RADIUS;
+    return {
+      x: viewW - r - 26 - (i === 1 ? r * 2.1 : 0),
+      y: viewH - r - 26 - (i === 0 ? 0 : i === 1 ? r * 0.5 : r * 2.1),
+    };
+  }
+  return { x: viewW / 2 + (i - 1) * BUTTON_GAP, y: viewH - BUTTON_BOTTOM_MARGIN };
+}
+
 /**
  * Draw the screen-space HUD. Call after the camera transform is restored.
  */
 export function drawHud(ctx, viewW, viewH, elapsed) {
-  const cx = viewW / 2;
-  const cy = viewH - BUTTON_BOTTOM_MARGIN;
-
   for (let i = 0; i < KEYS.length; i++) {
-    const key = KEYS[i];
-    drawAbilityButton(ctx, cx + (i - 1) * BUTTON_GAP, cy, key);
+    const p = abilityButtonPos(i, viewW, viewH);
+    drawAbilityButton(ctx, p.x, p.y, KEYS[i]);
   }
 
+  if (isTouch()) drawMoveZone(ctx, viewH);
+
   drawHearts(ctx, 22, 24, elapsed);
-  drawUltimateBar(ctx, 22, 52, elapsed);
+  drawUltimateBar(ctx, ULT_BAR.x, ULT_BAR.y, elapsed);
   if (bossActive()) drawBossBar(ctx, viewW);
+  drawToast(ctx, viewW, viewH, elapsed);
 }
 
 /**
@@ -74,7 +110,7 @@ function drawBossBar(ctx, viewW) {
 
   // Currently exposed colour.
   const cx = viewW / 2;
-  drawDiamond(ctx, cx, y + 30, 10, palette[boss.weak], 1, 16);
+  drawMarker(ctx, cx, y + 30, 10, boss.weak, 1, 16);
 
   // Countdown ring around it, so the window's remaining time is visible.
   ctx.strokeStyle = palette[boss.weak];
@@ -99,22 +135,19 @@ function drawBossBar(ctx, viewW) {
   ctx.stroke();
 
   const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 70);
-  drawDiamond(ctx, cx + 54, y + 30, 8, palette[boss.next], pulse, 12 * pulse);
+  drawMarker(ctx, cx + 54, y + 30, 8, boss.next, pulse, 12 * pulse);
 }
 
-function drawDiamond(ctx, x, y, size, color, alpha, glow) {
+/** One colour marker, drawn with that colour's glyph (Section 10). */
+function drawMarker(ctx, x, y, size, colorName, alpha, glow) {
+  const color = palette[colorName];
   ctx.save();
   ctx.translate(x, y);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = glow;
-  ctx.beginPath();
-  ctx.moveTo(0, -size);
-  ctx.lineTo(size, 0);
-  ctx.lineTo(0, size);
-  ctx.lineTo(-size, 0);
-  ctx.closePath();
+  drawGlyph(ctx, HIT_COLORS.indexOf(colorName), size);
   ctx.fill();
   ctx.restore();
 }
@@ -166,8 +199,8 @@ function drawHearts(ctx, x, y, elapsed) {
  * colour, filling with the spectrum as it charges.
  */
 function drawUltimateBar(ctx, x, y, elapsed) {
-  const w = 150;
-  const h = 9;
+  const w = ULT_BAR.w;
+  const h = ULT_BAR.h;
   const ready = isUltimateReady();
 
   // Track.
@@ -203,6 +236,7 @@ function drawUltimateBar(ctx, x, y, elapsed) {
 }
 
 function drawAbilityButton(ctx, x, y, key) {
+  const r = buttonRadius();
   const color = palette[KEY_COLOR[key]];
   const progress = cooldownProgress(key);
   const ready = cooldowns[key] <= 0;
@@ -215,7 +249,7 @@ function drawAbilityButton(ctx, x, y, key) {
   ctx.strokeStyle = palette.hudDim;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(0, 0, BUTTON_RADIUS, 0, Math.PI * 2);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
   // Cooldown fill, sweeping from the top.
@@ -223,7 +257,7 @@ function drawAbilityButton(ctx, x, y, key) {
     ctx.strokeStyle = color;
     ctx.globalAlpha = 0.55;
     ctx.beginPath();
-    ctx.arc(0, 0, BUTTON_RADIUS, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
     ctx.stroke();
     ctx.globalAlpha = 1;
   } else {
@@ -233,21 +267,16 @@ function drawAbilityButton(ctx, x, y, key) {
     ctx.shadowColor = color;
     ctx.shadowBlur = armed ? 18 : 10;
     ctx.beginPath();
-    ctx.arc(0, 0, BUTTON_RADIUS, 0, Math.PI * 2);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 
-  // Core glyph: the diamond from the reference art. Filled when ready, hollow
-  // while recharging -- a shape difference, so the state does not rely on
-  // colour alone.
-  const size = BUTTON_RADIUS * 0.44;
-  ctx.beginPath();
-  ctx.moveTo(0, -size);
-  ctx.lineTo(size, 0);
-  ctx.lineTo(0, size);
-  ctx.lineTo(-size, 0);
-  ctx.closePath();
+  // The key's own colour glyph. Filled when ready, hollow while recharging --
+  // a shape difference, so cooldown state does not rely on colour alone, and
+  // the glyph itself teaches which shape this key's colour produces.
+  const size = r * 0.44;
+  drawGlyph(ctx, HIT_COLORS.indexOf(KEY_COLOR[key]), size);
 
   if (ready) {
     ctx.fillStyle = color;
@@ -259,11 +288,13 @@ function drawAbilityButton(ctx, x, y, key) {
   }
 
   // Key cap.
-  ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
-  ctx.font = 'bold 12px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(key.toUpperCase(), 0, BUTTON_RADIUS + 16);
+  if (!isTouch()) {
+    ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(key.toUpperCase(), 0, r + 16);
+  }
 
   // Remaining seconds, so the cooldown is a readout and not just a gauge.
   if (!ready) {
@@ -313,6 +344,77 @@ export function drawComboIndicator(ctx, player) {
   ctx.globalAlpha = 0.75;
   ctx.beginPath();
   ctx.arc(0, 0, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// --- Toast ------------------------------------------------------------------
+/**
+ * A short-lived line of text, used for settings feedback and the opening key
+ * hint. Section 10 asks for the colourblind mode to be a selectable setting;
+ * with no menu in the byte budget, the cycle key plus a confirmation of what it
+ * landed on is the honest minimum.
+ */
+let toastText = '';
+let toastUntil = 0;
+
+export function showToast(text, elapsed, seconds = 2.6) {
+  toastText = text;
+  toastUntil = elapsed + seconds;
+}
+
+function drawToast(ctx, viewW, viewH, elapsed) {
+  if (elapsed > toastUntil) return;
+
+  // Fade out over the last half second rather than vanishing.
+  const remaining = toastUntil - elapsed;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, remaining * 2);
+  ctx.fillStyle = palette.hudText;
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(toastText, viewW / 2, viewH - (isTouch() ? 210 : 96));
+  ctx.restore();
+}
+
+/**
+ * The left-hand movement zone (GDD Section 3.2).
+ *
+ * Drawn faintly rather than as a hard d-pad: it is a drag zone, so what matters
+ * is communicating *where* to put a thumb, not which of four buttons to press.
+ */
+function drawMoveZone(ctx, viewH) {
+  const cx = 84;
+  const cy = viewH - 84;
+
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = palette.hudText;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Arrows: drag horizontally to run, upward to jump.
+  ctx.beginPath();
+  ctx.moveTo(cx - 26, cy);
+  ctx.lineTo(cx - 14, cy);
+  ctx.moveTo(cx - 22, cy - 5);
+  ctx.lineTo(cx - 27, cy);
+  ctx.lineTo(cx - 22, cy + 5);
+  ctx.moveTo(cx + 26, cy);
+  ctx.lineTo(cx + 14, cy);
+  ctx.moveTo(cx + 22, cy - 5);
+  ctx.lineTo(cx + 27, cy);
+  ctx.lineTo(cx + 22, cy + 5);
+  ctx.moveTo(cx, cy - 26);
+  ctx.lineTo(cx, cy - 14);
+  ctx.moveTo(cx - 5, cy - 22);
+  ctx.lineTo(cx, cy - 27);
+  ctx.lineTo(cx + 5, cy - 22);
   ctx.stroke();
 
   ctx.restore();

@@ -21,6 +21,7 @@ export const held = {
   e: false,
   ult: false,
   mute: false,
+  palette: false,
 };
 
 /** Keys that went down this frame. Cleared by `endFrame()`. */
@@ -40,6 +41,9 @@ const KEY_MAP = {
   KeyR: 'ult',
   // Music now plays from the first bar, so a way to silence it is not optional.
   KeyM: 'mute',
+  // Section 10 asks for the colourblind mode to be selectable independently of
+  // any other setting; with no menu in the byte budget, C cycles it directly.
+  KeyC: 'palette',
 };
 
 /**
