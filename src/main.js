@@ -53,6 +53,23 @@ import {
   bossTouching,
   bossActive,
 } from './boss.js';
+import {
+  initAudio,
+  sfxJump,
+  sfxArm,
+  sfxCancel,
+  sfxCast,
+  sfxHit,
+  sfxResist,
+  sfxHurt,
+  sfxUltimate,
+  sfxBossHit,
+  sfxBossDefeat,
+  setMusicIntensity,
+  setMusicTheme,
+  updateMusic,
+} from './audio.js';
+import { HIT_COLORS } from './palette.js';
 import { drawHud, drawComboIndicator } from './hud.js';
 import { DASH_IMPULSE } from './config.js';
 
@@ -82,8 +99,12 @@ function resize() {
 
 addEventListener('resize', resize);
 resize();
+initAudio();
 
 let elapsed = 0;
+
+/** Previous frame's armed state, for detecting arm/cancel transitions. */
+let wasArmed = false;
 
 startLevel();
 
@@ -114,7 +135,15 @@ function update(dt) {
     jumpPressed: !aiming && !!pressed.up,
   };
 
+  // Arming and cancelling are audible so the combo window has a rhythm the
+  // player can feel without watching the HUD.
+  if (isArmed() && !wasArmed) sfxArm();
+  else if (!isArmed() && wasArmed && !fired) sfxCancel();
+  wasArmed = isArmed();
+
   updatePlayer(dt, intent);
+  if (player.justJumped) sfxJump();
+
   updateEnemies(dt);
   updateBoss(dt, player.x);
   updateRestoration(dt);
@@ -125,16 +154,18 @@ function update(dt) {
   // resource, and explicitly unaffected by the per-key cooldowns (Section 4.3).
   if (pressed.ult && fireUltimate()) {
     spawnUltimateEffect(player.x + player.w / 2, player.y + player.h / 2);
+    sfxUltimate();
     addShake(16);
   }
 
   updateEffects(dt);
   resolveHits(onEnemyKilled, onEnemyStripped);
-  resolveBossHits(onBossHit, onBossDefeated);
+  if (resolveBossHits(onBossHit, onBossDefeated)) sfxResist();
 
   // Contact damage (Section 5). Enemies have no ranged attacks by design.
   const toucher = enemyTouching(player) || bossTouching(player);
   if (toucher && damagePlayer(toucher.x + toucher.w / 2)) {
+    sfxHurt();
     addShake(7);
     if (player.hearts <= 0) onDeath();
   }
@@ -142,16 +173,28 @@ function update(dt) {
   // Falling into a pit costs a heart like any other hazard, rather than
   // restarting outright -- only running out of hearts does that.
   if (player.y > level.killY) {
-    if (damagePlayer()) addShake(5);
+    if (damagePlayer()) {
+      sfxHurt();
+      addShake(5);
+    }
     if (player.hearts <= 0) onDeath();
     else resetPlayer();
   }
 
   updateCamera(dt, player, viewW, viewH);
+
+  // Dynamic music (Section 8). Intensity is progress toward the boss arena, so
+  // the score tightens as the player approaches and the change in intensity
+  // itself communicates "danger ahead" -- no UI, no dialogue.
+  const engaged = bossActive();
+  setMusicTheme(engaged ? 'boss' : 'level');
+  setMusicIntensity(engaged ? 1 : player.x / level.bossArenaX);
+  updateMusic();
 }
 
 function onAbilityFired(ability) {
   spawnEffect(ability, player.x + player.w / 2, player.y + player.h / 2);
+  sfxCast(HIT_COLORS.indexOf(ability.color), ability.archetype);
 
   // Assault abilities move the player: the dash is the mechanic, not decoration.
   if (ability.archetype === 'assault') {
@@ -189,14 +232,22 @@ function onEnemyKilled(enemy, exact, viaUltimate) {
   // Per-kill colour restoration (Section 7, beat 1). Deliberately subtle: this
   // must stay ambient texture and never compete with the boss-defeat beat.
   addKillRestoration();
+  // The ultimate has its own sound; a per-enemy hit on top of it would just be
+  // noise when it clears a whole screen at once.
+  if (!viaUltimate) sfxHit(HIT_COLORS.indexOf(enemy.core), true);
   addShake(exact ? 6 : 4);
 }
 
-function onEnemyStripped() {
+function onEnemyStripped(enemy) {
+  // The core has already shifted, so this pitches to the colour still NEEDED
+  // rather than the one that just landed -- the sound tells the player what is
+  // left to do, which is the more useful half of the information.
+  sfxHit(HIT_COLORS.indexOf(enemy.core), false);
   addShake(2);
 }
 
 function onBossHit() {
+  sfxBossHit();
   addShake(9);
 }
 
@@ -207,6 +258,7 @@ function onBossHit() {
  */
 function onBossDefeated(defeated) {
   triggerBossRestoration(defeated.x + defeated.w / 2, defeated.y + defeated.h / 2);
+  sfxBossDefeat();
   addShake(22);
 }
 

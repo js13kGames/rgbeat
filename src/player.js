@@ -139,11 +139,15 @@ export function updatePlayer(dt, intent) {
   player.jumpBuffered = intent.jumpPressed ? 0 : player.jumpBuffered + dt;
   const canJump = player.onGround || player.airTime < COYOTE_TIME;
 
+  // Set each frame so the caller can react to a jump without polling state.
+  player.justJumped = false;
+
   if (player.jumpBuffered < JUMP_BUFFER && canJump) {
     player.vy = JUMP_VELOCITY;
     player.jumpBuffered = 99;
     player.airTime = COYOTE_TIME; // consume the coyote window
     player.onGround = false;
+    player.justJumped = true;
   }
 
   // Variable jump height: releasing early cuts the rise short.
