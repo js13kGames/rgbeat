@@ -1,17 +1,18 @@
 /**
  * HUD (GDD Section 11).
  *
- * Currently: the three ability-key indicators with their cooldown state, and
- * the on-player combo/aim indicator. Hearts and the ultimate bar join them in
- * later phases.
+ * The heart row, the ultimate bar, the three ability-key cooldown indicators,
+ * the boss readout and the on-player combo/aim indicator.
  *
  * Section 11 is explicit about what does NOT belong here: there is no
  * combo-streak counter, no score multiplier, and no "suggested next sequence"
  * hint. The reference concept art shows all three; they were reviewed and
  * deliberately rejected. Do not add them.
  *
- * The visual language (ring, diamond core glyph, key cap below) is taken from
- * docs/reference/UI.png, translated into flat procedural shapes.
+ * The visual language (ring, core glyph, key cap below) is taken from
+ * docs/reference/UI.png, translated into flat procedural shapes. Every colour
+ * marker uses that colour's glyph rather than a shared diamond, so the HUD is
+ * readable without hue (Section 10).
  */
 import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';

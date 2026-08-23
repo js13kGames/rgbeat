@@ -63,9 +63,6 @@ export function toggleMute() {
   return !muted;
 }
 
-export function isMuted() {
-  return muted;
-}
 
 /**
  * One synth voice: an oscillator with a pitch sweep and a percussive envelope.

@@ -6,8 +6,8 @@
  * colour, the body stays near-white so it reads against both the grayscale
  * world and a fully restored one.
  *
- * Health, damage and i-frames arrive in the combat phase (Section 5); this
- * module owns movement and presentation only.
+ * It also owns the health state from Section 5 -- hearts, i-frames, knockback
+ * and the hurt flicker -- because all of it acts on the same body.
  */
 import {
   GRAVITY,
@@ -74,9 +74,6 @@ export function revivePlayer() {
   player.invuln = 0;
 }
 
-export function isInvulnerable() {
-  return player.invuln > 0;
-}
 
 /**
  * Take one heart of damage.

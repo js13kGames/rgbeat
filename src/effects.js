@@ -11,8 +11,8 @@
  * The output colour is carried on the effect and comes from the palette by
  * name, never as a literal, so colourblind swaps reach ability VFX too.
  *
- * Shape/glyph redundancy for colourblind play (Section 10) attaches here, on
- * `drawEffect` -- that lands with the accessibility phase.
+ * Each effect also carries its output colour's glyph (Section 10), so the
+ * player can confirm which colour they fired without relying on hue.
  */
 import { ABILITY_RANGE, EFFECT_LIFETIME, ULTIMATE_RADIUS, ULTIMATE_LIFETIME } from './config.js';
 import { palette, rainbow, HIT_COLORS } from './palette.js';

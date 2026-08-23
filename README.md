@@ -119,9 +119,18 @@ This gets us the same class of result ECT/advzip would, with no native binary.
 ### Roadroller
 
 [Roadroller](https://lifthrasiir.github.io/roadroller/) is wired up but **disabled by default**.
-It packs JavaScript very well, but costs roughly 1 KB of decoder stub and makes the shipped
-output unreadable in devtools. It only pays for itself once we're genuinely tight on bytes,
-so it stays opt-in via `npm run build:roadroller` until the budget demands it.
+It packs JavaScript very well, but makes the shipped output unreadable in devtools and adds
+noticeable time to every build, so it stays opt-in via `npm run build:roadroller`.
+
+It is held in reserve rather than used. Measured on the current build:
+
+| | zip | headroom |
+| --- | --- | --- |
+| default (Terser only) | 10,989 B | 2,323 B |
+| `build:roadroller` | 9,718 B | 3,594 B |
+
+So there is **~1.27 KB of additional headroom available on demand** if a late feature needs
+it. Reach for this before cutting anything from the GDD's scope list.
 
 ---
 
@@ -154,6 +163,12 @@ These are non-negotiable and apply to every change:
 - **Zero external resources.** No CDN scripts, no remote fonts, no analytics, no network calls of
   any kind. All graphics and audio are generated procedurally at runtime (GDD Sections 8–9).
 - **Zero `console.error`** on current Chrome and Firefox, fully playable.
+  > **Testing status:** verified continuously in Chromium. **Firefox has not been
+  > run** — it is not installed on the development machine. Every browser API used
+  > is long-supported there, and the Web Audio calls avoid the one real Firefox
+  > divergence (`exponentialRampToValueAtTime` throws on a zero target or a ramp
+  > from zero; every ramp here is floored at `0.0001`). That is a static argument,
+  > not a test. **Run it in Firefox before submitting.**
 - **No build step after unzipping** — a plain `index.html` at the zip root that just works.
 - **Readable source in the repo.** This repo is cloned by the js13kGames organization as a
   community learning resource, so `src/` stays modular and unminified.
@@ -165,20 +180,59 @@ These are non-negotiable and apply to every change:
 ## Project layout
 
 ```
-src/            readable game source (ES modules), the thing humans edit
-  index.html    page shell; the build inlines the bundle into a minified copy
-  main.js       entry point: canvas setup and the fixed-timestep loop
-tools/          build tooling
-  build.mjs     the pipeline: dev server, preview server, production build
-  zip.mjs       minimal ZIP writer with Zopfli compression
-  size.mjs      byte-budget reporting, also runnable standalone
-  clean.mjs     removes build output
+src/              readable game source (ES modules), the thing humans edit
+  index.html      page shell; the build inlines the bundle into a minified copy
+  main.js         entry point: canvas setup, the fixed-timestep loop, wiring
+  config.js       every tunable value, in one place
+  palette.js      the central palette + colourblind modes (Sections 9–10)
+  render.js       shared ink helpers and the per-colour glyphs
+  world.js        level geometry, collision, ink-wash renderer, restoration
+  player.js       platformer physics, health, procedural unicorn
+  camera.js       follow camera and screen shake
+  input.js        keyboard state
+  touch.js        touch controls, writing into the same input state
+  combo.js        the two-key grammar and the three cooldowns (Section 4)
+  effects.js      ability effects: one shape per archetype, used to hit-test
+  enemies.js      primary / secondary / volatile enemies (Section 6)
+  boss.js         the boss and its cycling weakness (Section 6.4)
+  ultimate.js     the ultimate bar and its two-tier charge rule (Section 4.3)
+  audio.js        synthesised SFX and the dynamic music system (Section 8)
+  hud.js          HUD (Section 11)
+tools/            build and verification tooling — zero shipped bytes
+  build.mjs       the pipeline: dev server, preview server, production build
+  zip.mjs         minimal ZIP writer with Zopfli compression
+  size.mjs        byte-budget reporting, also runnable standalone
+  check-level.mjs proves every ledge and gap is reachable, by simulation
+  check-balance.mjs proves the Section 4.2 timing constraint holds
+  clean.mjs       removes build output
 docs/
   RGBeat_GDD_1.md   the Game Design Document — source of truth
   reference/        concept art (style reference only, never shipped)
-dist/           production output (gitignored)
-dist-dev/       dev server output (gitignored)
+dist/             production output (gitignored)
+dist-dev/         dev server output (gitignored)
 ```
+
+## Verification
+
+Two design constraints in the GDD are stated as hard requirements, and both are
+too easy to get wrong by eye — so each has a script that proves it rather than
+asserting it. Both are dev-only and cost nothing in the shipped zip.
+
+```bash
+npm run check
+```
+
+- **`check:level`** runs the *real* physics integrator from `src/player.js` and
+  searches takeoff points for one that actually lands, rather than approximating
+  the jump arc. It also reports how wide each takeoff window is — a gap only one
+  takeoff point can clear passes a pass/fail reachability test but still feels
+  unfair — and enforces overhead clearance around every pit, because a ledge above
+  a pit approach clips the jump arc and silently makes the gap pixel-perfect.
+- **`check:balance`** proves GDD Section 4.2: that the player can reliably land a
+  hit inside every boss weak-colour window at the current cooldown. The worst case
+  is not obvious by inspection — it is a *secondary* colour whose two keys both
+  went cold moments earlier — so the script derives required keys from the real
+  combo table and simulates entire fights. It covers volatile enemy windows too.
 
 `docs/reference/` holds painterly concept art used only to pin down palette, silhouette and HUD
 mood. It is deliberately **not** shippable: all in-game visuals are procedural Canvas 2D shapes

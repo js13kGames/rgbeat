@@ -12,7 +12,8 @@
  *              - the two component primaries in either order, the core
  *                visibly shifting to show what is still needed
  *
- * Volatile enemies (Section 6.3) and the boss (Section 6.4) are later phases.
+ * Volatile variants (Section 6.3) shift their core if left unstruck; the boss
+ * lives in boss.js.
  * Enemies damage the player by contact only -- Section 5 is explicit that
  * ranged attacks must not creep in as an implementation afterthought.
  */
@@ -21,6 +22,7 @@ import {
   ENEMY_HEIGHT,
   ENEMY_SPEED,
   ENEMY_HURT_FLASH,
+  VOLATILE_SHIFT_TIME,
   INK,
 } from './config.js';
 import { palette, MIX, HIT_COLORS, RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
@@ -48,9 +50,13 @@ const PLACEMENTS = [
   { x: 1660, surface: 545, core: BLUE, patrol: [1605, 1770] },
   { x: 1930, surface: 455, core: PURPLE, patrol: [1885, 2040] },
   { x: 2260, surface: 545, core: CYAN, patrol: [2205, 2380] },
-  { x: 2520, surface: 455, core: ORANGE, patrol: [2475, 2630] },
+
+  // The level's back half, once the grammar is fluent: volatile cores that
+  // shift if left alone (Section 6.3). Used sparingly and only here -- they are
+  // meant to be a spike of tension, not the default enemy.
+  { x: 2520, surface: 455, core: ORANGE, patrol: [2475, 2630], volatile: 1 },
   { x: 2700, surface: 640, core: GREEN, patrol: [2620, 2780] },
-  { x: 2860, surface: 540, core: PURPLE, patrol: [2805, 2970] },
+  { x: 2860, surface: 540, core: PURPLE, patrol: [2805, 2970], volatile: 1 },
 ];
 
 /** Live enemies. */
@@ -83,6 +89,9 @@ export function spawnEnemies() {
        * clean one-shot with the exact matching colour.
        */
       stripped: false,
+      /** Section 6.3: does this core shift if it is not struck in time? */
+      volatile: !!p.volatile,
+      shiftTimer: VOLATILE_SHIFT_TIME,
       dir: 1,
       patrolMin: p.patrol[0],
       patrolMax: p.patrol[1] - ENEMY_WIDTH,
@@ -105,7 +114,31 @@ export function updateEnemies(dt) {
     }
     if (e.flash > 0) e.flash -= dt;
     e.phase += dt;
+
+    if (e.volatile) {
+      e.shiftTimer -= dt;
+      if (e.shiftTimer <= 0) shiftCore(e);
+    }
   }
+}
+
+/**
+ * Move a volatile enemy's core to a different colour (Section 6.3).
+ *
+ * It shifts within its own class -- a primary becomes another primary, a
+ * secondary another secondary -- so the enemy stays the same *kind* of problem
+ * and only the answer changes. Shifting a secondary into a primary would
+ * quietly make it easier, which is the opposite of the intent.
+ */
+function shiftCore(enemy) {
+  const pool = HIT_COLORS.filter(
+    (c) => c !== enemy.core && isSecondary(c) === isSecondary(enemy.core)
+  );
+  enemy.core = pool[(Math.random() * pool.length) | 0];
+  // A shift resets the strip progress: the enemy is a different problem now.
+  enemy.stripped = false;
+  enemy.shiftTimer = VOLATILE_SHIFT_TIME;
+  enemy.flash = ENEMY_HURT_FLASH;
 }
 
 /**
@@ -168,6 +201,9 @@ function applyHit(enemy, effect, index, onKill, onStrip) {
       enemy.core = parts.find((p) => p !== color);
       enemy.stripped = true;
       enemy.flash = ENEMY_HURT_FLASH;
+      // Landing a hit buys a fresh window: a volatile enemy should never shift
+      // out from under a player who is actively solving it.
+      enemy.shiftTimer = VOLATILE_SHIFT_TIME;
       onStrip(enemy);
       return;
     }
@@ -280,6 +316,23 @@ function drawCore(ctx, x, y, enemy) {
   ctx.fillStyle = color;
   drawGlyph(ctx, index, size);
   ctx.fill();
+
+  // Volatile enemies wear a draining ring, so the pressure is legible rather
+  // than a surprise -- the shift should be a race the player can see losing.
+  if (enemy.volatile) {
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(
+      0,
+      0,
+      size + 5,
+      -Math.PI / 2,
+      -Math.PI / 2 + Math.PI * 2 * (enemy.shiftTimer / VOLATILE_SHIFT_TIME)
+    );
+    ctx.stroke();
+  }
 
   // Inner highlight, which makes the core read as lit rather than painted.
   ctx.shadowBlur = 0;

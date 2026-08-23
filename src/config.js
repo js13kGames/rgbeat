@@ -170,8 +170,6 @@ export const ULTIMATE_LIFETIME = 0.85;
  */
 export const BOSS_WIPE_DURATION = 1.8;
 
-/** Soft edge on the advancing colour front, in px. */
-export const BOSS_WIPE_EDGE = 90;
 
 // --- Boss (GDD Section 6.4) -------------------------------------------------
 export const BOSS_WIDTH = 76;
@@ -204,3 +202,14 @@ export const BOSS_TELEGRAPH = 1.2;
 
 /** Seconds the boss is stunned and flashing after taking a hit. */
 export const BOSS_HIT_STUN = 0.4;
+
+// --- Volatile enemies (GDD Section 6.3) -------------------------------------
+/**
+ * How long a volatile enemy holds a colour before shifting to another.
+ *
+ * Subject to the same constraint as the boss's weak window (Section 4.2): if
+ * the player cannot land a valid hit inside it at the current cooldown, the
+ * enemy is not a tension spike, it is a wall. `npm run check:balance` verifies
+ * this alongside the boss timing.
+ */
+export const VOLATILE_SHIFT_TIME = 3.2;

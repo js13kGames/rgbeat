@@ -15,7 +15,13 @@
  *
  * Run via `npm run check:balance`. Dev-only: zero shipped bytes.
  */
-import { COOLDOWN, BOSS_WEAK_WINDOW, BOSS_TELEGRAPH, AIM_WINDOW } from '../src/config.js';
+import {
+  COOLDOWN,
+  BOSS_WEAK_WINDOW,
+  BOSS_TELEGRAPH,
+  AIM_WINDOW,
+  VOLATILE_SHIFT_TIME,
+} from '../src/config.js';
 import { ABILITIES } from '../src/combo.js';
 import { HIT_COLORS } from '../src/palette.js';
 
@@ -187,6 +193,23 @@ console.log(
     (BOSS_WEAK_WINDOW - worst.hitAt).toFixed(2) +
     's to spare)'
 );
+
+// --- Volatile enemies (Section 6.3) -----------------------------------------
+/**
+ * A volatile core shifting before the player can possibly answer it would make
+ * the enemy a wall rather than a tension spike, so it faces the same test as a
+ * boss window.
+ */
+console.log('\nVolatile shift window');
+for (const color of HIT_COLORS) {
+  const keys = keysFor[color];
+  const total = Math.max(...keys.map((k) => COOLDOWN[k])) + EXECUTION_TIME;
+  const slack = VOLATILE_SHIFT_TIME - total;
+  const label = color.padEnd(7) + ' worst case ' + total.toFixed(2) + 's of ' + VOLATILE_SHIFT_TIME + 's';
+  if (slack < 0) fail(label + '  IMPOSSIBLE');
+  else if (slack < 0.4) fail(label + '  only ' + slack.toFixed(2) + 's slack');
+  else console.log('  ok    ' + label + '  slack ' + slack.toFixed(2) + 's');
+}
 
 // --- Telegraph sanity -------------------------------------------------------
 console.log('\nTelegraph');
