@@ -95,10 +95,17 @@ export const AIM_WINDOW = 0.7;
  */
 export const COOLDOWN = { q: 1.8, w: 1.8, e: 1.8 };
 
-/** Reach of each mechanic archetype, in px. */
+/**
+ * Reach of each mechanic archetype, in px.
+ *
+ * Assault must stay longer than the distance the dash itself carries the
+ * player (DASH_IMPULSE * EFFECT_LIFETIME, roughly 150px). At 130 the strike
+ * ended behind the player's own landing spot, so enemies they dashed *into*
+ * fell outside the hitbox and the ability felt far shorter than it looked.
+ */
 export const ABILITY_RANGE = {
   guard: 95, // nova radius, centred on the player
-  assault: 130, // dash-strike length
+  assault: 210, // dash-strike length, clearing the dash's own travel
   flow: 150, // arc sweep radius
 };
 

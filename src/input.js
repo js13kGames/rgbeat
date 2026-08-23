@@ -20,6 +20,7 @@ export const held = {
   w: false,
   e: false,
   ult: false,
+  mute: false,
 };
 
 /** Keys that went down this frame. Cleared by `endFrame()`. */
@@ -37,6 +38,8 @@ const KEY_MAP = {
   // ability). R sits directly beside the Q/W/E ability row, so the whole combat
   // vocabulary stays under one hand.
   KeyR: 'ult',
+  // Music now plays from the first bar, so a way to silence it is not optional.
+  KeyM: 'mute',
 };
 
 /**

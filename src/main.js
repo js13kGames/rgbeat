@@ -65,6 +65,7 @@ import {
   sfxUltimate,
   sfxBossHit,
   sfxBossDefeat,
+  toggleMute,
   setMusicIntensity,
   setMusicTheme,
   updateMusic,
@@ -149,6 +150,8 @@ function update(dt) {
   updateRestoration(dt);
 
   if (fired) onAbilityFired(fired);
+
+  if (pressed.mute) toggleMute();
 
   // The ultimate sits outside the combo grammar entirely: its own key, its own
   // resource, and explicitly unaffected by the per-key cooldowns (Section 4.3).

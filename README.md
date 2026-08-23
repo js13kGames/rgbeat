@@ -19,6 +19,7 @@ single source of truth for mechanics, combat, audio, accessibility and scope.
 | **Q / W / E** | Ability keys. Two presses make a combo: the **first** key picks how the ability behaves, the **second** picks the colour it deals. |
 | **← ↑ → ↓** *(while a combo is armed)* | Aim. Movement is suspended; releasing without a second key cancels harmlessly. |
 | **R** | Ultimate — a full-spectrum explosion that ignores colour matching. Needs a full bar. |
+| **M** | Mute / unmute all audio. |
 
 Each of Q, W and E has its own cooldown. A pure combo (`Q→Q`) spends one; a mixed
 combo (`Q→W`) spends both, which is what makes secondary colours more expensive to

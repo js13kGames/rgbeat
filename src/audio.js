@@ -25,6 +25,11 @@ let muted = false;
  * the jam requires a clean console.
  */
 function ctx() {
+  // Nothing is created before the first gesture. Constructing an AudioContext
+  // early leaves it suspended and makes the browser log an autoplay warning on
+  // every resume attempt, which would pollute a console the jam requires clean.
+  if (!unlocked) return null;
+
   if (!audio) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
@@ -37,9 +42,18 @@ function ctx() {
   return audio;
 }
 
-/** Attach one-time unlock handlers. Safe to call before any gesture. */
+let unlocked = false;
+
+/**
+ * Arm audio. Browsers require a user gesture before any sound can play, so the
+ * music cannot literally start on page load -- it starts on the player's first
+ * input, which for this game is the first movement key.
+ */
 export function initAudio() {
-  const unlock = () => ctx();
+  const unlock = () => {
+    unlocked = true;
+    ctx();
+  };
   addEventListener('keydown', unlock);
   addEventListener('pointerdown', unlock);
 }
@@ -279,8 +293,20 @@ let nextStepTime = 0;
 let intensity = 0;
 let themeName = 'level';
 
+/**
+ * Floor on musical intensity.
+ *
+ * Raw level progress starts near zero, which left only the sparse bass line
+ * playing -- technically music, but close to inaudible for the first stretch
+ * of the level. The floor means there is always a real groove, while the
+ * layers above it (hats at 0.45, lead at 0.5, octave at 0.82) still arrive as
+ * the player nears the boss, so Section 8's escalation is preserved.
+ */
+const MIN_INTENSITY = 0.34;
+
 export function setMusicIntensity(value) {
-  intensity = Math.max(0, Math.min(1, value));
+  const scaled = MIN_INTENSITY + (1 - MIN_INTENSITY) * Math.max(0, Math.min(1, value));
+  intensity = Math.min(1, scaled);
 }
 
 export function setMusicTheme(name) {
@@ -326,6 +352,22 @@ export function updateMusic() {
   }
 }
 
+/**
+ * Intensity at which each layer joins.
+ *
+ * Bass, kick and lead all sit at or below MIN_INTENSITY, so the player hears an
+ * actual tune from the first bar rather than a bassline. The escalation toward
+ * the boss is then carried by tempo, the hi-hats, and the octave doubling --
+ * which is still the layering Section 8 asks for, just starting from a floor
+ * that is worth listening to.
+ */
+const LAYER = {
+  kick: 0.22,
+  lead: 0.3,
+  hat: 0.55,
+  octave: 0.82,
+};
+
 function scheduleStep(a, step, when) {
   const theme = THEMES[themeName];
 
@@ -336,22 +378,22 @@ function scheduleStep(a, step, when) {
     voiceAt(a, 'triangle', f, f * 0.98, 0.22, 0.3, when, musicGain);
   }
 
-  // Percussion fades in early: the first sign that something is coming.
-  if (intensity > 0.22 && step % 4 === 0) {
+  if (intensity > LAYER.kick && step % 4 === 0) {
     voiceAt(a, 'sine', 90, 40, 0.12, 0.28 * intensity, when, musicGain);
   }
-  if (intensity > 0.45 && step % 2 === 1) {
+
+  // Hats arrive later: the first sign the boss is close.
+  if (intensity > LAYER.hat && step % 2 === 1) {
     burstAt(a, 0.03, 0.05 * intensity, 6000, when);
   }
 
-  // Lead enters late, so the approach to the boss genuinely escalates.
-  if (intensity > 0.5) {
+  if (intensity > LAYER.lead) {
     const lead = theme.lead[step];
     if (lead !== null) {
       const f = note(theme.root, lead);
       voiceAt(a, 'square', f, f, 0.14, 0.09 * intensity, when, musicGain);
       // A high octave doubles the lead at full tension.
-      if (intensity > 0.82) {
+      if (intensity > LAYER.octave) {
         voiceAt(a, 'triangle', f * 2, f * 2, 0.1, 0.05, when, musicGain);
       }
     }
