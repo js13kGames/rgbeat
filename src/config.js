@@ -107,3 +107,37 @@ export const EFFECT_LIFETIME = 0.32;
 
 /** Forward impulse applied to the player by Assault (dash) abilities. */
 export const DASH_IMPULSE = 460;
+
+// --- Player health (GDD Section 5) ------------------------------------------
+/** Starting hearts. Section 15 recommends 4. */
+export const MAX_HEARTS = 4;
+
+/** Invulnerability after taking a hit, in seconds. */
+export const IFRAME_TIME = 1.1;
+
+/** Knockback applied on damage, so a hit is readable and cannot chain. */
+export const HURT_KNOCKBACK_X = 260;
+export const HURT_KNOCKBACK_Y = -320;
+
+/** How long the player is unable to steer after a hit. */
+export const HURT_STUN = 0.22;
+
+// --- Enemies (GDD Section 6) ------------------------------------------------
+export const ENEMY_WIDTH = 30;
+export const ENEMY_HEIGHT = 52;
+
+/** Patrol speed for enemies that walk their platform. */
+export const ENEMY_SPEED = 46;
+
+/** Seconds an enemy flashes after surviving a hit that stripped a colour. */
+export const ENEMY_HURT_FLASH = 0.25;
+
+// --- Ultimate (GDD Section 4.3) ---------------------------------------------
+/**
+ * Ultimate charge per kill, 0..1 of a full bar. Reading an enemy correctly and
+ * one-shotting it with the exact matching colour is rewarded roughly twice as
+ * well as stripping it down one primary at a time -- a clear incentive for
+ * skilled play that keeps the slower path viable.
+ */
+export const ULTIMATE_CHARGE_EXACT = 0.2;
+export const ULTIMATE_CHARGE_STRIPPED = 0.1;

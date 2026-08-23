@@ -5,12 +5,28 @@
  * Gameplay lives in the modules it pulls together.
  */
 import { held, pressed, endFrame } from './input.js';
-import { player, updatePlayer, drawPlayer, resetPlayer } from './player.js';
+import {
+  player,
+  updatePlayer,
+  drawPlayer,
+  resetPlayer,
+  revivePlayer,
+  damagePlayer,
+} from './player.js';
 import { camera, updateCamera, applyCamera, addShake } from './camera.js';
-import { level, drawWorld } from './world.js';
+import { level, drawWorld, addKillRestoration, restoration } from './world.js';
 import { updateJitter } from './render.js';
-import { updateCombo, isArmed, resetCombo } from './combo.js';
-import { spawnEffect, updateEffects, drawEffects, clearEffects } from './effects.js';
+import { updateCombo, isArmed, resetCombo, combo, cooldowns } from './combo.js';
+import { spawnEffect, updateEffects, drawEffects, clearEffects, effects } from './effects.js';
+import {
+  enemies,
+  spawnEnemies,
+  updateEnemies,
+  drawEnemies,
+  resolveHits,
+  enemyTouching,
+} from './enemies.js';
+import { addUltimateCharge, resetUltimate, ultimate } from './ultimate.js';
 import { drawHud, drawComboIndicator } from './hud.js';
 import { DASH_IMPULSE } from './config.js';
 
@@ -41,6 +57,16 @@ resize();
 
 let elapsed = 0;
 
+startLevel();
+
+function startLevel() {
+  revivePlayer();
+  resetCombo();
+  resetUltimate();
+  clearEffects();
+  spawnEnemies();
+}
+
 function update(dt) {
   elapsed += dt;
   updateJitter(elapsed);
@@ -59,13 +85,26 @@ function update(dt) {
   };
 
   updatePlayer(dt, intent);
+  updateEnemies(dt);
 
   if (fired) onAbilityFired(fired);
   updateEffects(dt);
+  resolveHits(onEnemyKilled, onEnemyStripped);
 
-  // Falling out of the level. Full health handling arrives with Section 5;
-  // for now this just prevents an endless fall.
-  if (player.y > level.killY) respawn();
+  // Contact damage (Section 5). Enemies have no ranged attacks by design.
+  const toucher = enemyTouching(player);
+  if (toucher && damagePlayer(toucher.x + toucher.w / 2)) {
+    addShake(7);
+    if (player.hearts <= 0) onDeath();
+  }
+
+  // Falling into a pit costs a heart like any other hazard, rather than
+  // restarting outright -- only running out of hearts does that.
+  if (player.y > level.killY) {
+    if (damagePlayer()) addShake(5);
+    if (player.hearts <= 0) onDeath();
+    else resetPlayer();
+  }
 
   updateCamera(dt, player, viewW, viewH);
 }
@@ -85,10 +124,33 @@ function onAbilityFired(ability) {
   addShake(ability.archetype === 'assault' ? 5 : 3);
 }
 
-function respawn() {
-  resetPlayer();
-  resetCombo();
-  clearEffects();
+/**
+ * @param {object} enemy the enemy that died
+ * @param {boolean} exact whether it was a clean exact-colour one-shot
+ */
+function onEnemyKilled(enemy, exact) {
+  if (__DEV__) {
+    killLog.push({
+      killedCore: enemy.core,
+      spawnedAs: enemy.originalCore,
+      exact,
+      byEffects: effects.map((e) => e.color + '/' + e.archetype),
+    });
+  }
+  addUltimateCharge(exact);
+  // Per-kill colour restoration (Section 7, beat 1). Deliberately subtle: this
+  // must stay ambient texture and never compete with the boss-defeat beat.
+  addKillRestoration();
+  addShake(exact ? 6 : 4);
+}
+
+function onEnemyStripped() {
+  addShake(2);
+}
+
+/** Out of hearts: restart the level (Section 5). */
+function onDeath() {
+  startLevel();
 }
 
 function render() {
@@ -97,13 +159,23 @@ function render() {
 
   const view = { x: camera.x, y: camera.y, w: viewW, h: viewH };
   drawWorld(ctx, view);
+  drawEnemies(ctx, view);
   drawEffects(ctx);
   drawPlayer(ctx);
   drawComboIndicator(ctx, player);
 
   ctx.restore();
 
-  drawHud(ctx, viewW, viewH);
+  drawHud(ctx, viewW, viewH, elapsed);
+}
+
+// Dev-only: expose live state so behaviour can be inspected and asserted on
+// from the browser instead of inferred from pixels. `__DEV__` is replaced at
+// build time and this whole block is compiled out of production builds.
+const killLog = [];
+
+if (__DEV__) {
+  window.rgbeat = { player, enemies, ultimate, combo, cooldowns, effects, restoration, held, killLog };
 }
 
 let last = performance.now();

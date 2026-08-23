@@ -1,0 +1,290 @@
+/**
+ * Enemies (GDD Section 6).
+ *
+ * All enemies are grayscale human silhouettes with a coloured core in the
+ * chest. The core says exactly what is needed to kill them, and it visibly
+ * updates as colour is stripped from it -- that readability is the whole point
+ * (Section 2, pillar 2: reading, not memorizing).
+ *
+ *   primary    core is one primary colour; the matching colour kills it
+ *   secondary  core is a secondary colour, killable two ways:
+ *              - one hit with the matching secondary (exact read, big reward)
+ *              - the two component primaries in either order, the core
+ *                visibly shifting to show what is still needed
+ *
+ * Volatile enemies (Section 6.3) and the boss (Section 6.4) are later phases.
+ * Enemies damage the player by contact only -- Section 5 is explicit that
+ * ranged attacks must not creep in as an implementation afterthought.
+ */
+import {
+  ENEMY_WIDTH,
+  ENEMY_HEIGHT,
+  ENEMY_SPEED,
+  ENEMY_HURT_FLASH,
+  INK,
+} from './config.js';
+import { palette, MIX, RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
+import { effects, effectOverlaps } from './effects.js';
+import { inkRect, mixColor } from './render.js';
+import { restorationAmount } from './world.js';
+
+/**
+ * Level enemy placements.
+ *
+ * Ordered along the level to teach the grammar in the order Section 12 asks
+ * for: primaries first, then secondaries once the player can read a core.
+ * `y` is the surface they stand on; the spawn converts it to a body position.
+ */
+const PLACEMENTS = [
+  // Ground 1 -- a single primary, room to experiment.
+  { x: 430, surface: 640, core: RED, patrol: [370, 560] },
+
+  // Ground 2 -- two primaries, then the first secondary.
+  { x: 820, surface: 640, core: BLUE, patrol: [760, 1000] },
+  { x: 960, surface: 545, core: GREEN, patrol: [905, 1050] },
+  { x: 1180, surface: 640, core: ORANGE, patrol: [1090, 1260] },
+
+  // Ground 3 -- secondaries become the norm.
+  { x: 1660, surface: 545, core: BLUE, patrol: [1605, 1770] },
+  { x: 1930, surface: 455, core: PURPLE, patrol: [1885, 2040] },
+  { x: 2260, surface: 545, core: CYAN, patrol: [2205, 2380] },
+  { x: 2520, surface: 455, core: ORANGE, patrol: [2475, 2630] },
+  { x: 2700, surface: 640, core: GREEN, patrol: [2620, 2780] },
+  { x: 2860, surface: 540, core: PURPLE, patrol: [2805, 2970] },
+];
+
+/** Live enemies. */
+export const enemies = [];
+
+/**
+ * Is this colour a secondary (i.e. a mix of two primaries)?
+ * Derived from the palette's MIX table so there is one source of truth.
+ */
+function isSecondary(color) {
+  return color in MIX;
+}
+
+export function spawnEnemies() {
+  enemies.length = 0;
+
+  for (const p of PLACEMENTS) {
+    enemies.push({
+      x: p.x,
+      y: p.surface - ENEMY_HEIGHT,
+      w: ENEMY_WIDTH,
+      h: ENEMY_HEIGHT,
+      /** The colour currently required to hurt it. Shown as the chest core. */
+      core: p.core,
+      /** The colour it spawned with, for rendering and scoring decisions. */
+      originalCore: p.core,
+      /**
+       * True once a secondary enemy has had one primary stripped from it.
+       * Section 4.3: a kill finished this way charges the ultimate less than a
+       * clean one-shot with the exact matching colour.
+       */
+      stripped: false,
+      dir: 1,
+      patrolMin: p.patrol[0],
+      patrolMax: p.patrol[1] - ENEMY_WIDTH,
+      flash: 0,
+      /** Bob phase, so a row of enemies does not move in lockstep. */
+      phase: p.x * 0.01,
+    });
+  }
+}
+
+export function updateEnemies(dt) {
+  for (const e of enemies) {
+    e.x += e.dir * ENEMY_SPEED * dt;
+    if (e.x <= e.patrolMin) {
+      e.x = e.patrolMin;
+      e.dir = 1;
+    } else if (e.x >= e.patrolMax) {
+      e.x = e.patrolMax;
+      e.dir = -1;
+    }
+    if (e.flash > 0) e.flash -= dt;
+    e.phase += dt;
+  }
+}
+
+/**
+ * Resolve every live ability effect against every enemy.
+ *
+ * @param {(enemy: object, exact: boolean) => void} onKill
+ *   called when an enemy dies; `exact` distinguishes the one-shot exact-colour
+ *   read from the slower strip-it-down path (Section 4.3).
+ * @param {(enemy: object) => void} onStrip called when a hit removes a colour
+ *   but leaves the enemy alive.
+ */
+export function resolveHits(onKill, onStrip) {
+  for (const effect of effects) {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const enemy = enemies[i];
+
+      // One swing may only hit a given enemy once.
+      if (effect.hit.has(enemy)) continue;
+      if (!effectOverlaps(effect, enemy)) continue;
+
+      effect.hit.add(enemy);
+      applyHit(enemy, effect.color, i, onKill, onStrip);
+    }
+  }
+}
+
+/**
+ * Apply one coloured hit to an enemy.
+ *
+ * The three outcomes, in the order Section 6.2 describes them:
+ *   - the colour matches the core exactly     -> dies
+ *   - the core is secondary and the colour is
+ *     one of its two components               -> core shifts to the remainder
+ *   - anything else                           -> no effect
+ */
+function applyHit(enemy, color, index, onKill, onStrip) {
+  if (color === enemy.core) {
+    enemies.splice(index, 1);
+    // An "exact" kill means the killing blow matched the enemy's full
+    // remaining requirement in one hit AND nothing had been stripped first.
+    onKill(enemy, !enemy.stripped);
+    return;
+  }
+
+  if (isSecondary(enemy.core)) {
+    const parts = MIX[enemy.core];
+    if (parts.includes(color)) {
+      // Strip: the core visibly becomes the colour still needed.
+      enemy.core = parts.find((p) => p !== color);
+      enemy.stripped = true;
+      enemy.flash = ENEMY_HURT_FLASH;
+      onStrip(enemy);
+      return;
+    }
+  }
+
+  // Wrong colour: the enemy shrugs it off. Flash anyway so the player gets
+  // feedback that the hit landed but was the wrong read.
+  enemy.flash = ENEMY_HURT_FLASH * 0.6;
+}
+
+/** Does anything overlap the player's body? Used for contact damage. */
+export function enemyTouching(rect) {
+  for (const e of enemies) {
+    if (
+      rect.x < e.x + e.w &&
+      rect.x + rect.w > e.x &&
+      rect.y < e.y + e.h &&
+      rect.y + rect.h > e.y
+    ) {
+      return e;
+    }
+  }
+  return null;
+}
+
+// --- Rendering --------------------------------------------------------------
+
+export function drawEnemies(ctx, view) {
+  const t = restorationAmount();
+
+  for (const e of enemies) {
+    if (e.x + e.w < view.x - 60 || e.x > view.x + view.w + 60) continue;
+    drawEnemy(ctx, e, t);
+  }
+}
+
+/**
+ * A human silhouette in ink, with the stolen colour burning in its chest.
+ *
+ * The body is deliberately flat and dark: Section 9 keeps the enemy itself
+ * desaturated so the core is the only thing competing for attention.
+ */
+function drawEnemy(ctx, e, t) {
+  const bob = Math.sin(e.phase * 4) * 1.5;
+  const cx = e.x + e.w / 2;
+  const top = e.y + bob;
+
+  ctx.save();
+
+  // Silhouette: head, torso, legs as simple blocks. Enough to read as human
+  // at a glance without costing bytes on anatomy.
+  ctx.fillStyle = mixColor('#0c0c10', '#2a2438', t * 0.5);
+
+  // Head.
+  ctx.beginPath();
+  ctx.arc(cx, top + 9, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Torso, tapering to the waist.
+  ctx.beginPath();
+  ctx.moveTo(cx - 11, top + 18);
+  ctx.lineTo(cx + 11, top + 18);
+  ctx.lineTo(cx + 8, top + 36);
+  ctx.lineTo(cx - 8, top + 36);
+  ctx.closePath();
+  ctx.fill();
+
+  // Legs.
+  const stride = Math.sin(e.phase * 6) * 3;
+  ctx.fillRect(cx - 8, top + 36, 6, 16 + stride);
+  ctx.fillRect(cx + 2, top + 36, 6, 16 - stride);
+
+  // Arms, hanging.
+  ctx.fillRect(cx - 14, top + 19, 4, 15);
+  ctx.fillRect(cx + 10, top + 19, 4, 15);
+
+  // Ink outline, so enemies read as drawings rather than shapes.
+  ctx.strokeStyle = mixColor(palette.inkFaint, palette.ink, 0.4);
+  ctx.lineWidth = INK.lineWidth * 0.7;
+  inkRect(ctx, cx - 11, top + 18, 22, 18, e.x);
+  ctx.stroke();
+
+  drawCore(ctx, cx, top + 27, e);
+
+  ctx.restore();
+}
+
+/**
+ * The chest core: a diamond, taken from the reference art. Its colour is the
+ * requirement, so it glows hard enough to be read across the screen.
+ *
+ * Colourblind shape redundancy (Section 10) attaches here -- a distinct glyph
+ * per colour, so the requirement never depends on hue alone. That lands with
+ * the accessibility phase.
+ */
+function drawCore(ctx, x, y, enemy) {
+  const color = palette[enemy.core];
+  const hurt = enemy.flash > 0;
+  const size = hurt ? 9 : 7.5;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.shadowColor = color;
+  ctx.shadowBlur = hurt ? 22 : 14;
+
+  // Outer diamond.
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -size);
+  ctx.lineTo(size, 0);
+  ctx.lineTo(0, size);
+  ctx.lineTo(-size, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner highlight, which makes the core read as lit rather than painted.
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = '#fff';
+  const inner = size * 0.34;
+  ctx.beginPath();
+  ctx.moveTo(0, -inner);
+  ctx.lineTo(inner, 0);
+  ctx.lineTo(0, inner);
+  ctx.lineTo(-inner, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}

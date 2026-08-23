@@ -71,6 +71,15 @@ const esbuildOptions = {
   charset: 'utf8',
 };
 
+/**
+ * Build-time flag. Dev builds expose game state for inspection and automated
+ * checks; production builds compile the whole block away, so it costs nothing
+ * in the shipped bytes. Terser drops `if (false) { ... }` entirely.
+ */
+function defineFor(dev) {
+  return { __DEV__: String(dev) };
+}
+
 // ---------------------------------------------------------------------------
 // Dev
 // ---------------------------------------------------------------------------
@@ -85,6 +94,7 @@ async function dev() {
   const ctx = await esbuild.context({
     ...esbuildOptions,
     outfile: DIST_DEV + '/game.js',
+    define: defineFor(true),
     sourcemap: true,
     minify: false,
   });
@@ -137,7 +147,12 @@ async function build() {
   mkdirSync(DIST, { recursive: true });
 
   // 1. Bundle
-  const result = await esbuild.build({ ...esbuildOptions, write: false, minify: false });
+  const result = await esbuild.build({
+    ...esbuildOptions,
+    define: defineFor(false),
+    write: false,
+    minify: false,
+  });
   const bundled = result.outputFiles[0].text;
 
   // 2. Minify. `unsafe` transforms are fine here: this is our own code and we

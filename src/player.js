@@ -22,6 +22,11 @@ import {
   JUMP_BUFFER,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
+  MAX_HEARTS,
+  IFRAME_TIME,
+  HURT_KNOCKBACK_X,
+  HURT_KNOCKBACK_Y,
+  HURT_STUN,
 } from './config.js';
 import { palette, rainbow } from './palette.js';
 import { level, overlapsSolid } from './world.js';
@@ -43,14 +48,61 @@ export const player = {
   jumpBuffered: 99,
   /** Drives the gallop cycle and mane sway. */
   animTime: 0,
+
+  // --- Health (GDD Section 5) ---
+  hearts: MAX_HEARTS,
+  /** Seconds of invulnerability remaining. Also drives the hurt flicker. */
+  invuln: 0,
+  /** Seconds the player cannot steer, so a hit reads as a real interruption. */
+  stun: 0,
 };
 
+/** Move the player back to the spawn point without touching their health. */
 export function resetPlayer() {
   player.x = level.spawn.x;
   player.y = level.spawn.y;
   player.vx = 0;
   player.vy = 0;
   player.onGround = false;
+  player.stun = 0;
+}
+
+/** Full reset: position and health. Used when a life is lost entirely. */
+export function revivePlayer() {
+  resetPlayer();
+  player.hearts = MAX_HEARTS;
+  player.invuln = 0;
+}
+
+export function isInvulnerable() {
+  return player.invuln > 0;
+}
+
+/**
+ * Take one heart of damage.
+ *
+ * Grants i-frames plus knockback away from the source, both so the hit is
+ * readable and so a single contact cannot chain into several lost hearts
+ * (Section 5). Returns true if the damage was actually applied.
+ *
+ * @param {number} fromX x position of whatever dealt the damage, for knockback
+ *   direction. Omit for hazards with no meaningful direction (e.g. a pit).
+ */
+export function damagePlayer(fromX) {
+  if (player.invuln > 0) return false;
+
+  player.hearts--;
+  player.invuln = IFRAME_TIME;
+  player.stun = HURT_STUN;
+
+  if (fromX !== undefined) {
+    const away = player.x + player.w / 2 < fromX ? -1 : 1;
+    player.vx = away * HURT_KNOCKBACK_X;
+    player.vy = HURT_KNOCKBACK_Y;
+    player.onGround = false;
+  }
+
+  return true;
 }
 
 /**
@@ -62,6 +114,15 @@ export function resetPlayer() {
  *   away while aiming (Section 3.1) -- during that time `move` is simply 0.
  */
 export function updatePlayer(dt, intent) {
+  if (player.invuln > 0) player.invuln -= dt;
+
+  // While stunned the player keeps their knockback momentum but cannot steer,
+  // which is what makes a hit feel like an interruption rather than a nudge.
+  if (player.stun > 0) {
+    player.stun -= dt;
+    intent = { move: 0, jumpHeld: false, jumpPressed: false };
+  }
+
   // --- Horizontal ---
   const accel = player.onGround ? ACCEL : AIR_ACCEL;
   if (intent.move !== 0) {
@@ -149,6 +210,13 @@ export function drawPlayer(ctx) {
   const { x, y, w, h, facing, animTime, onGround, vx } = player;
 
   ctx.save();
+
+  // Hurt flicker. Blinking the one saturated thing on screen is unusually
+  // legible here, precisely because nothing else is coloured.
+  if (player.invuln > 0 && Math.floor(player.invuln * 18) % 2 === 0) {
+    ctx.globalAlpha = 0.35;
+  }
+
   // Draw in a local space with the origin at the player's feet, mirrored by
   // facing, so all the shape maths below can assume "facing right".
   ctx.translate(x + w / 2, y + h);

@@ -13,9 +13,11 @@
  * The visual language (ring, diamond core glyph, key cap below) is taken from
  * docs/reference/UI.png, translated into flat procedural shapes.
  */
-import { palette } from './palette.js';
+import { palette, rainbow } from './palette.js';
 import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';
-import { AIM_WINDOW } from './config.js';
+import { AIM_WINDOW, MAX_HEARTS } from './config.js';
+import { player } from './player.js';
+import { ultimate, isUltimateReady } from './ultimate.js';
 
 /** Which colour each key shows on its HUD button (its base colour, Section 4). */
 const KEY_COLOR = { q: 'blue', w: 'red', e: 'green' };
@@ -27,13 +29,91 @@ const BUTTON_BOTTOM_MARGIN = 58;
 /**
  * Draw the screen-space HUD. Call after the camera transform is restored.
  */
-export function drawHud(ctx, viewW, viewH) {
+export function drawHud(ctx, viewW, viewH, elapsed) {
   const cx = viewW / 2;
   const cy = viewH - BUTTON_BOTTOM_MARGIN;
 
   for (let i = 0; i < KEYS.length; i++) {
     const key = KEYS[i];
     drawAbilityButton(ctx, cx + (i - 1) * BUTTON_GAP, cy, key);
+  }
+
+  drawHearts(ctx, 22, 24, elapsed);
+  drawUltimateBar(ctx, 22, 52, elapsed);
+}
+
+/**
+ * The heart row (GDD Sections 5 and 11).
+ *
+ * Hearts cycle through a rainbow purely as theme. Section 5 is explicit that a
+ * heart's hue carries NO gameplay meaning and must not be confusable with the
+ * six hit-colours -- so this reads from `rainbow()` rather than the palette's
+ * colour slots, and the cycle is continuous rather than landing on named hues.
+ */
+function drawHearts(ctx, x, y, elapsed) {
+  const size = 9;
+  const gap = 24;
+
+  for (let i = 0; i < MAX_HEARTS; i++) {
+    const filled = i < player.hearts;
+    const hx = x + i * gap;
+
+    ctx.save();
+    ctx.translate(hx, y);
+
+    if (filled) {
+      ctx.fillStyle = rainbow(elapsed * 0.12 + i / MAX_HEARTS, 62);
+      ctx.shadowColor = rainbow(elapsed * 0.12 + i / MAX_HEARTS, 62);
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.strokeStyle = palette.hudDim;
+      ctx.lineWidth = 1.5;
+    }
+
+    // A heart from two arcs and a point.
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.75);
+    ctx.bezierCurveTo(-size * 1.4, -size * 0.2, -size * 0.5, -size * 1.1, 0, -size * 0.35);
+    ctx.bezierCurveTo(size * 0.5, -size * 1.1, size * 1.4, -size * 0.2, 0, size * 0.75);
+    ctx.closePath();
+
+    if (filled) ctx.fill();
+    else ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+/**
+ * The ultimate bar (Section 11): the one UI element allowed to show full
+ * colour, filling with the spectrum as it charges.
+ */
+function drawUltimateBar(ctx, x, y, elapsed) {
+  const w = 150;
+  const h = 9;
+  const ready = isUltimateReady();
+
+  // Track.
+  ctx.strokeStyle = palette.hudDim;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w, h);
+
+  // Fill: a live rainbow gradient, so the bar visibly *is* the stolen colour
+  // coming back rather than an abstract meter.
+  const fill = Math.max(0, Math.min(1, ultimate.charge)) * w;
+  if (fill > 0) {
+    const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+    for (let i = 0; i <= 6; i++) {
+      grad.addColorStop(i / 6, rainbow(i / 6 + elapsed * 0.08, 58));
+    }
+    ctx.fillStyle = grad;
+    if (ready) {
+      // Pulse when full, so "available" is noticeable in peripheral vision.
+      ctx.shadowColor = rainbow(elapsed * 0.4, 65);
+      ctx.shadowBlur = 10 + Math.sin(elapsed * 6) * 6;
+    }
+    ctx.fillRect(x, y, fill, h);
+    ctx.shadowBlur = 0;
   }
 }
 
