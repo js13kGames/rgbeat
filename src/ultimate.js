@@ -34,6 +34,21 @@ export function addUltimateCharge(exact) {
   ultimate.charge = Math.min(1, ultimate.charge + amount);
 }
 
+/**
+ * Spend a full bar.
+ *
+ * Section 4.3 is explicit that the ultimate is not affected by, and does not
+ * consume, the per-key cooldowns -- it is a separate resource entirely, which
+ * is what lets it work as a panic button.
+ *
+ * @returns {boolean} true if it fired
+ */
+export function fireUltimate() {
+  if (!isUltimateReady()) return false;
+  ultimate.charge = 0;
+  return true;
+}
+
 export function resetUltimate() {
   ultimate.charge = 0;
 }

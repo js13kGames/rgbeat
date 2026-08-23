@@ -14,10 +14,26 @@ import {
   damagePlayer,
 } from './player.js';
 import { camera, updateCamera, applyCamera, addShake } from './camera.js';
-import { level, drawWorld, addKillRestoration, restoration } from './world.js';
+import {
+  level,
+  drawWorld,
+  addKillRestoration,
+  restoration,
+  updateRestoration,
+  resetRestoration,
+  triggerBossRestoration,
+  setWipeViewport,
+} from './world.js';
 import { updateJitter } from './render.js';
 import { updateCombo, isArmed, resetCombo, combo, cooldowns } from './combo.js';
-import { spawnEffect, updateEffects, drawEffects, clearEffects, effects } from './effects.js';
+import {
+  spawnEffect,
+  spawnUltimateEffect,
+  updateEffects,
+  drawEffects,
+  clearEffects,
+  effects,
+} from './effects.js';
 import {
   enemies,
   spawnEnemies,
@@ -26,7 +42,7 @@ import {
   resolveHits,
   enemyTouching,
 } from './enemies.js';
-import { addUltimateCharge, resetUltimate, ultimate } from './ultimate.js';
+import { addUltimateCharge, resetUltimate, fireUltimate, ultimate } from './ultimate.js';
 import { drawHud, drawComboIndicator } from './hud.js';
 import { DASH_IMPULSE } from './config.js';
 
@@ -50,6 +66,8 @@ function resize() {
   canvas.width = viewW * dpr;
   canvas.height = viewH * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // The boss wipe is sized to the screen, so it must follow resizes.
+  setWipeViewport(viewW, viewH);
 }
 
 addEventListener('resize', resize);
@@ -63,6 +81,7 @@ function startLevel() {
   revivePlayer();
   resetCombo();
   resetUltimate();
+  resetRestoration();
   clearEffects();
   spawnEnemies();
 }
@@ -86,8 +105,17 @@ function update(dt) {
 
   updatePlayer(dt, intent);
   updateEnemies(dt);
+  updateRestoration(dt);
 
   if (fired) onAbilityFired(fired);
+
+  // The ultimate sits outside the combo grammar entirely: its own key, its own
+  // resource, and explicitly unaffected by the per-key cooldowns (Section 4.3).
+  if (pressed.ult && fireUltimate()) {
+    spawnUltimateEffect(player.x + player.w / 2, player.y + player.h / 2);
+    addShake(16);
+  }
+
   updateEffects(dt);
   resolveHits(onEnemyKilled, onEnemyStripped);
 
@@ -127,17 +155,24 @@ function onAbilityFired(ability) {
 /**
  * @param {object} enemy the enemy that died
  * @param {boolean} exact whether it was a clean exact-colour one-shot
+ * @param {boolean} viaUltimate whether the ultimate made the kill
  */
-function onEnemyKilled(enemy, exact) {
+function onEnemyKilled(enemy, exact, viaUltimate) {
   if (__DEV__) {
     killLog.push({
       killedCore: enemy.core,
       spawnedAs: enemy.originalCore,
       exact,
+      viaUltimate,
       byEffects: effects.map((e) => e.color + '/' + e.archetype),
     });
   }
-  addUltimateCharge(exact);
+
+  // Ultimate kills deliberately do NOT feed the bar. The GDD says every kill
+  // charges it (Section 4.3) but does not consider this case; letting a
+  // ten-enemy ultimate refill the bar it just spent would make it
+  // self-sustaining and remove the resource decision entirely.
+  if (!viaUltimate) addUltimateCharge(exact);
   // Per-kill colour restoration (Section 7, beat 1). Deliberately subtle: this
   // must stay ambient texture and never compete with the boss-defeat beat.
   addKillRestoration();
@@ -175,7 +210,20 @@ function render() {
 const killLog = [];
 
 if (__DEV__) {
-  window.rgbeat = { player, enemies, ultimate, combo, cooldowns, effects, restoration, held, killLog };
+  window.rgbeat = {
+    player,
+    enemies,
+    ultimate,
+    combo,
+    cooldowns,
+    effects,
+    restoration,
+    held,
+    killLog,
+    // The boss does not exist yet, so the dramatic restoration beat is
+    // triggerable directly for now. Phase 5 hooks it to the boss's death.
+    triggerBossRestoration,
+  };
 }
 
 let last = performance.now();

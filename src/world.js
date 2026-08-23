@@ -2,17 +2,21 @@
  * The world: level geometry, collision, and the grayscale ink-wash renderer
  * (GDD Sections 7 and 9).
  *
- * Colour restoration is modelled here as two independent channels, exactly as
- * Section 7 requires -- they must never blend into one effect:
+ * Colour restoration is two deliberately different things, exactly as Section 7
+ * requires -- they must never blend into one effect:
  *
- *   `ambient`  slow, accumulates a little per enemy kill, deliberately subtle
- *   `boss`     fast, driven by the boss-defeat animation, overrides toward full
+ *   `ambient`  a scalar that creeps up a little per enemy kill. Subtle by
+ *              design, and capped well below full colour so the level still
+ *              looks stolen when the boss dies.
+ *   `boss`     an animated spatial wipe sweeping out from where the boss died,
+ *              repainting the world as it passes.
  *
- * The rendered amount is max(ambient, boss), so the dramatic beat always wins
- * and the ambient drip can never pre-empt it.
+ * They are not two settings of one dial: the ambient drip changes how the world
+ * is tinted, while the boss beat draws the world twice and clips the coloured
+ * pass to an advancing front. Collapsing them would cost the payoff.
  */
-import { palette } from './palette.js';
-import { INK } from './config.js';
+import { palette, rainbow } from './palette.js';
+import { INK, BOSS_WIPE_DURATION } from './config.js';
 import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
 
 /**
@@ -92,10 +96,27 @@ const TERRAIN_HUE = '#2f5a3a';
 
 export const level = LEVEL;
 
-/** Colour restoration channels. See the module comment. */
+/**
+ * Colour restoration state. See the module comment.
+ *
+ * The two beats are kept structurally separate on purpose. The ambient channel
+ * is a scalar that creeps up; the boss beat is an animated spatial wipe. They
+ * are not two settings of one effect, and they must never be collapsed into
+ * one -- Section 7 is explicit that muddling them loses the payoff.
+ */
 export const restoration = {
+  /** Slow per-kill accumulation, 0..AMBIENT_CAP. */
   ambient: 0,
+
+  /** Boss wipe progress, 0..1. */
   boss: 0,
+  /** Whether the wipe is currently sweeping. */
+  wipeActive: false,
+  /** Origin of the colour front, in world space. */
+  wipeX: 0,
+  wipeY: 0,
+  /** Current radius of the advancing front. */
+  wipeRadius: 0,
 };
 
 /**
@@ -104,9 +125,65 @@ export const restoration = {
  */
 const AMBIENT_CAP = 0.35;
 
+/**
+ * How far the front must travel, in px.
+ *
+ * Scaled to the VIEWPORT, not the level. Sizing it to the level made the front
+ * cross the visible screen in about a tenth of a second -- technically a wipe,
+ * but far too fast to read as one. What the player must see is the front
+ * sweeping across their screen; the rest of the level is covered by latching
+ * `ambient` to 1 when the animation completes.
+ */
+let wipeTargetRadius = 1200;
+
+export function setWipeViewport(viewW, viewH) {
+  wipeTargetRadius = Math.hypot(viewW, viewH) * 1.15;
+}
+
 /** How much colour is currently showing, 0..1. */
 export function restorationAmount() {
-  return Math.max(restoration.ambient, restoration.boss);
+  return restoration.boss >= 1 ? 1 : restoration.ambient;
+}
+
+/**
+ * Boss-defeat restoration (Section 7, beat 2).
+ *
+ * Deliberately nothing like the per-kill drip: it is an animated front that
+ * sweeps out from where the boss died, repainting the world as it passes.
+ * @param {number} x origin in world space
+ * @param {number} y origin in world space
+ */
+export function triggerBossRestoration(x, y) {
+  restoration.wipeActive = true;
+  restoration.wipeX = x;
+  restoration.wipeY = y;
+  restoration.wipeRadius = 0;
+  restoration.boss = 0;
+}
+
+export function updateRestoration(dt) {
+  if (!restoration.wipeActive) return;
+
+  restoration.boss = Math.min(1, restoration.boss + dt / BOSS_WIPE_DURATION);
+  // A mild ease-out: quick enough to feel like a burst, slow enough that the
+  // front takes most of a second to cross the screen. A stronger curve here
+  // front-loads the motion so heavily that the sweep is over before it reads.
+  const eased = Math.pow(restoration.boss, 0.75);
+  restoration.wipeRadius = eased * wipeTargetRadius;
+
+  if (restoration.boss >= 1) {
+    // The world is fully repainted; the wipe stops being a live effect and
+    // becomes the new resting state.
+    restoration.wipeActive = false;
+    restoration.ambient = 1;
+  }
+}
+
+export function resetRestoration() {
+  restoration.ambient = 0;
+  restoration.boss = 0;
+  restoration.wipeActive = false;
+  restoration.wipeRadius = 0;
 }
 
 /**
@@ -137,11 +214,63 @@ export function overlapsSolid(x, y, w, h) {
  * @param {{x:number,y:number,w:number,h:number}} view camera rect in world space
  */
 export function drawWorld(ctx, view) {
-  const t = restorationAmount();
+  // The world as it currently stands: grayscale, plus whatever the slow
+  // per-kill drip has returned.
+  drawLayers(ctx, view, restorationAmount());
 
+  if (!restoration.wipeActive) return;
+
+  // The boss beat: the SAME world drawn in full colour, clipped to the
+  // advancing front. Drawing it twice is what makes this read as colour being
+  // pushed back into the world, rather than a value being turned up.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(restoration.wipeX, restoration.wipeY, restoration.wipeRadius, 0, Math.PI * 2);
+  ctx.clip();
+  drawLayers(ctx, view, 1);
+  ctx.restore();
+
+  drawWipeFront(ctx);
+}
+
+/** The world at a given restoration amount. */
+function drawLayers(ctx, view, t) {
   drawSky(ctx, view, t);
   drawBackdrop(ctx, view, t);
   drawTerrain(ctx, view, t);
+}
+
+/**
+ * The leading edge of the colour front: a bright rainbow rim. This is the part
+ * that makes the moment unmissable, so it is the one place in the world allowed
+ * to be loudly saturated.
+ */
+function drawWipeFront(ctx) {
+  const r = restoration.wipeRadius;
+  if (r <= 0) return;
+
+  // Fades as the front expands, so the effect resolves rather than lingering.
+  const strength = 1 - restoration.boss;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = strength;
+  ctx.lineWidth = 5 + strength * 14;
+
+  const grad = ctx.createLinearGradient(
+    restoration.wipeX - r,
+    restoration.wipeY,
+    restoration.wipeX + r,
+    restoration.wipeY
+  );
+  for (let i = 0; i <= 6; i++) grad.addColorStop(i / 6, rainbow(i / 6));
+  ctx.strokeStyle = grad;
+
+  ctx.beginPath();
+  ctx.arc(restoration.wipeX, restoration.wipeY, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawSky(ctx, view, t) {

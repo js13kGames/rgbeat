@@ -14,8 +14,8 @@
  * Shape/glyph redundancy for colourblind play (Section 10) attaches here, on
  * `drawEffect` -- that lands with the accessibility phase.
  */
-import { ABILITY_RANGE, EFFECT_LIFETIME } from './config.js';
-import { palette } from './palette.js';
+import { ABILITY_RANGE, EFFECT_LIFETIME, ULTIMATE_RADIUS, ULTIMATE_LIFETIME } from './config.js';
+import { palette, rainbow, HIT_COLORS } from './palette.js';
 
 /** Live effects. Short-lived; the array stays tiny. */
 export const effects = [];
@@ -44,6 +44,30 @@ export function spawnEffect(ability, x, y) {
     age: 0,
     life: EFFECT_LIFETIME,
     /** Enemies already hit by this effect, so one swing cannot hit twice. */
+    hit: new Set(),
+  });
+}
+
+/**
+ * Spawn the ultimate: a full-spectrum explosion that hits every enemy on screen
+ * at once, with all colours simultaneously (GDD Section 4.3).
+ *
+ * `ultimate` marks it as ignoring the colour-matching rule entirely -- it deals
+ * heavy damage regardless of an enemy's current core, which is what makes it a
+ * panic button rather than a bigger version of a normal ability.
+ */
+export function spawnUltimateEffect(x, y) {
+  effects.push({
+    archetype: 'ultimate',
+    ultimate: true,
+    color: null,
+    name: 'Spectrum Break',
+    x,
+    y,
+    aimX: 1,
+    aimY: 0,
+    age: 0,
+    life: ULTIMATE_LIFETIME,
     hit: new Set(),
   });
 }
@@ -77,6 +101,12 @@ export function effectOverlaps(effect, rect) {
   const dx = cx - effect.x;
   const dy = cy - effect.y;
   const dist = Math.hypot(dx, dy);
+
+  if (effect.ultimate) {
+    // Everything on screen, and it grows into that radius rather than applying
+    // instantly, so the explosion visibly reaches each enemy before killing it.
+    return dist <= ULTIMATE_RADIUS * (effect.age / effect.life) + r;
+  }
 
   if (effect.archetype === 'guard') {
     return dist <= ABILITY_RANGE.guard + r;
@@ -115,11 +145,50 @@ function drawEffect(ctx, effect) {
   // into a world that lost it, not like paint sitting on top.
   ctx.globalCompositeOperation = 'lighter';
 
-  if (effect.archetype === 'guard') drawGuard(ctx, t, color);
+  if (effect.ultimate) drawUltimate(ctx, t);
+  else if (effect.archetype === 'guard') drawGuard(ctx, t, color);
   else if (effect.archetype === 'assault') drawAssault(ctx, t, color, effect);
   else drawFlow(ctx, t, color, effect);
 
   ctx.restore();
+}
+
+/**
+ * The ultimate: every colour at once, which is the whole point -- the player
+ * briefly stops being "the only colour" and becomes all of it.
+ */
+function drawUltimate(ctx, t) {
+  const r = ULTIMATE_RADIUS * t;
+
+  // Spokes in all six hit-colours, so the full spectrum is literally present
+  // rather than implied by a rainbow gradient.
+  ctx.lineWidth = 6 * (1 - t) + 1;
+  for (let i = 0; i < HIT_COLORS.length; i++) {
+    const a = (i / HIT_COLORS.length) * Math.PI * 2 + t * 1.6;
+    ctx.strokeStyle = palette[HIT_COLORS[i]];
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+
+  // Expanding rainbow shockwave.
+  const grad = ctx.createLinearGradient(-r, 0, r, 0);
+  for (let i = 0; i <= 6; i++) grad.addColorStop(i / 6, rainbow(i / 6 + t));
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 10 * (1 - t) + 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Core flash, brightest at the start.
+  const flash = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.5);
+  flash.addColorStop(0, 'rgba(255,255,255,' + (1 - t) * 0.9 + ')');
+  flash.addColorStop(1, 'transparent');
+  ctx.fillStyle = flash;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.5, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /** Guard: a defensive nova expanding from the player. */

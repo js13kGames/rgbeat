@@ -19,6 +19,7 @@ export const held = {
   q: false,
   w: false,
   e: false,
+  ult: false,
 };
 
 /** Keys that went down this frame. Cleared by `endFrame()`. */
@@ -32,6 +33,10 @@ const KEY_MAP = {
   KeyQ: 'q',
   KeyW: 'w',
   KeyE: 'e',
+  // The GDD does not assign the ultimate a key (Section 4.3 describes only the
+  // ability). Space is the obvious free binding: the arrows are movement and
+  // aim, Q/W/E are the combo grammar, and Space reads as "the big one".
+  Space: 'ult',
 };
 
 /** Arrow keys scroll the page by default; the game needs them. */

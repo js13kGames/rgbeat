@@ -111,9 +111,10 @@ export function updateEnemies(dt) {
 /**
  * Resolve every live ability effect against every enemy.
  *
- * @param {(enemy: object, exact: boolean) => void} onKill
+ * @param {(enemy: object, exact: boolean, viaUltimate: boolean) => void} onKill
  *   called when an enemy dies; `exact` distinguishes the one-shot exact-colour
- *   read from the slower strip-it-down path (Section 4.3).
+ *   read from the slower strip-it-down path (Section 4.3), and `viaUltimate`
+ *   marks kills the ultimate made, which do not feed the bar back.
  * @param {(enemy: object) => void} onStrip called when a hit removes a colour
  *   but leaves the enemy alive.
  */
@@ -127,7 +128,7 @@ export function resolveHits(onKill, onStrip) {
       if (!effectOverlaps(effect, enemy)) continue;
 
       effect.hit.add(enemy);
-      applyHit(enemy, effect.color, i, onKill, onStrip);
+      applyHit(enemy, effect, i, onKill, onStrip);
     }
   }
 }
@@ -141,12 +142,22 @@ export function resolveHits(onKill, onStrip) {
  *     one of its two components               -> core shifts to the remainder
  *   - anything else                           -> no effect
  */
-function applyHit(enemy, color, index, onKill, onStrip) {
+function applyHit(enemy, effect, index, onKill, onStrip) {
+  // The ultimate carries every colour at once, so it bypasses the matching
+  // rule entirely and kills regardless of the current core (Section 4.3).
+  if (effect.ultimate) {
+    enemies.splice(index, 1);
+    onKill(enemy, false, true);
+    return;
+  }
+
+  const color = effect.color;
+
   if (color === enemy.core) {
     enemies.splice(index, 1);
     // An "exact" kill means the killing blow matched the enemy's full
     // remaining requirement in one hit AND nothing had been stripped first.
-    onKill(enemy, !enemy.stripped);
+    onKill(enemy, !enemy.stripped, false);
     return;
   }
 

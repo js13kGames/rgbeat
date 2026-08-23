@@ -141,3 +141,27 @@ export const ENEMY_HURT_FLASH = 0.25;
  */
 export const ULTIMATE_CHARGE_EXACT = 0.2;
 export const ULTIMATE_CHARGE_STRIPPED = 0.1;
+
+// --- Ultimate ability (GDD Section 4.3) -------------------------------------
+/**
+ * Reach of the full-spectrum explosion. Section 4.3 says it hits "every enemy
+ * on screen", so this is sized to a screen rather than tuned as a range.
+ */
+export const ULTIMATE_RADIUS = 700;
+
+/** The explosion is slower and heavier than a normal ability. */
+export const ULTIMATE_LIFETIME = 0.85;
+
+// --- Colour restoration (GDD Section 7) -------------------------------------
+/**
+ * Duration of the boss-defeat recolour wipe.
+ *
+ * Section 7 calls this the single biggest "wow" beat in the game and asks for
+ * disproportionate polish relative to its cost. It is deliberately slow enough
+ * to read as an event rather than a state change -- a player glancing at the
+ * screen must catch it.
+ */
+export const BOSS_WIPE_DURATION = 1.8;
+
+/** Soft edge on the advancing colour front, in px. */
+export const BOSS_WIPE_EDGE = 90;
