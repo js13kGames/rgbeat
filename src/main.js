@@ -23,6 +23,7 @@ import {
   resetRestoration,
   triggerBossRestoration,
   setWipeViewport,
+  restorationAmount,
 } from './world.js';
 import { updateJitter } from './render.js';
 import { updateCombo, isArmed, resetCombo, combo, cooldowns } from './combo.js';
@@ -43,6 +44,15 @@ import {
   enemyTouching,
 } from './enemies.js';
 import { addUltimateCharge, resetUltimate, fireUltimate, ultimate } from './ultimate.js';
+import {
+  boss,
+  spawnBoss,
+  updateBoss,
+  drawBoss,
+  resolveBossHits,
+  bossTouching,
+  bossActive,
+} from './boss.js';
 import { drawHud, drawComboIndicator } from './hud.js';
 import { DASH_IMPULSE } from './config.js';
 
@@ -84,6 +94,7 @@ function startLevel() {
   resetRestoration();
   clearEffects();
   spawnEnemies();
+  spawnBoss();
 }
 
 function update(dt) {
@@ -105,6 +116,7 @@ function update(dt) {
 
   updatePlayer(dt, intent);
   updateEnemies(dt);
+  updateBoss(dt, player.x);
   updateRestoration(dt);
 
   if (fired) onAbilityFired(fired);
@@ -118,9 +130,10 @@ function update(dt) {
 
   updateEffects(dt);
   resolveHits(onEnemyKilled, onEnemyStripped);
+  resolveBossHits(onBossHit, onBossDefeated);
 
   // Contact damage (Section 5). Enemies have no ranged attacks by design.
-  const toucher = enemyTouching(player);
+  const toucher = enemyTouching(player) || bossTouching(player);
   if (toucher && damagePlayer(toucher.x + toucher.w / 2)) {
     addShake(7);
     if (player.hearts <= 0) onDeath();
@@ -183,9 +196,41 @@ function onEnemyStripped() {
   addShake(2);
 }
 
-/** Out of hearts: restart the level (Section 5). */
+function onBossHit() {
+  addShake(9);
+}
+
+/**
+ * The boss is down. This is the game's biggest beat (Section 7): the dramatic
+ * recolour fires from where the boss stood, so the colour visibly comes back
+ * out of the thing that stole it.
+ */
+function onBossDefeated(defeated) {
+  triggerBossRestoration(defeated.x + defeated.w / 2, defeated.y + defeated.h / 2);
+  addShake(22);
+}
+
+/**
+ * Out of hearts (Section 5).
+ *
+ * Dying inside the boss arena restarts the fight rather than the whole level.
+ * Section 15 leaves this open; replaying the entire level after every boss
+ * attempt would be miserable, and this is far cheaper than the general
+ * checkpoint system Section 13 defers to P2.
+ */
 function onDeath() {
-  startLevel();
+  if (bossActive()) restartBossFight();
+  else startLevel();
+}
+
+function restartBossFight() {
+  revivePlayer();
+  resetCombo();
+  clearEffects();
+  spawnBoss();
+  // Put the player back at the arena mouth, already engaged.
+  player.x = level.bossArenaX - 60;
+  player.y = level.bossSpawn.y - player.h;
 }
 
 function render() {
@@ -195,6 +240,7 @@ function render() {
   const view = { x: camera.x, y: camera.y, w: viewW, h: viewH };
   drawWorld(ctx, view);
   drawEnemies(ctx, view);
+  drawBoss(ctx, view, restorationAmount());
   drawEffects(ctx);
   drawPlayer(ctx);
   drawComboIndicator(ctx, player);
@@ -220,6 +266,7 @@ if (__DEV__) {
     restoration,
     held,
     killLog,
+    boss,
     // The boss does not exist yet, so the dramatic restoration beat is
     // triggerable directly for now. Phase 5 hooks it to the boss's death.
     triggerBossRestoration,

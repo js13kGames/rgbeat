@@ -165,3 +165,35 @@ export const BOSS_WIPE_DURATION = 1.8;
 
 /** Soft edge on the advancing colour front, in px. */
 export const BOSS_WIPE_EDGE = 90;
+
+// --- Boss (GDD Section 6.4) -------------------------------------------------
+export const BOSS_WIDTH = 76;
+export const BOSS_HEIGHT = 120;
+export const BOSS_SPEED = 74;
+
+/**
+ * Hits needed to kill the boss. One per colour in a full rotation, so beating
+ * it requires the entire combo vocabulary rather than one favourite ability.
+ */
+export const BOSS_MAX_HP = 6;
+
+/**
+ * How long each weak-colour window lasts.
+ *
+ * Section 4.2 makes this a HARD constraint rather than a feel preference: the
+ * player must reliably land a valid hit inside EVERY window at the chosen
+ * cooldown. The worst case is a secondary colour needing two keys that both
+ * just went on cooldown, so this must comfortably exceed COOLDOWN plus the
+ * time to execute a two-key combo. `npm run check:balance` proves it.
+ */
+export const BOSS_WEAK_WINDOW = 3.6;
+
+/**
+ * How long before a switch the next colour is shown. Section 6.4 wants this to
+ * read as a reaction check, not a memorisation test, so the upcoming colour is
+ * always telegraphed.
+ */
+export const BOSS_TELEGRAPH = 1.2;
+
+/** Seconds the boss is stunned and flashing after taking a hit. */
+export const BOSS_HIT_STUN = 0.4;

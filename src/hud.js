@@ -15,9 +15,10 @@
  */
 import { palette, rainbow } from './palette.js';
 import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';
-import { AIM_WINDOW, MAX_HEARTS } from './config.js';
+import { AIM_WINDOW, MAX_HEARTS, BOSS_MAX_HP } from './config.js';
 import { player } from './player.js';
 import { ultimate, isUltimateReady } from './ultimate.js';
+import { boss, bossActive, windowProgress, isTelegraphing } from './boss.js';
 
 /** Which colour each key shows on its HUD button (its base colour, Section 4). */
 const KEY_COLOR = { q: 'blue', w: 'red', e: 'green' };
@@ -40,6 +41,82 @@ export function drawHud(ctx, viewW, viewH, elapsed) {
 
   drawHearts(ctx, 22, 24, elapsed);
   drawUltimateBar(ctx, 22, 52, elapsed);
+  if (bossActive()) drawBossBar(ctx, viewW);
+}
+
+/**
+ * Boss readout (GDD Section 6.4): remaining hits, the colour currently exposed,
+ * and the colour coming next once it is being telegraphed.
+ *
+ * The telegraph is shown here as well as on the boss itself, because during a
+ * fight the player's eyes are on their own position as often as on the boss.
+ */
+function drawBossBar(ctx, viewW) {
+  const w = 260;
+  const x = (viewW - w) / 2;
+  const y = 26;
+
+  // Remaining hits, as discrete pips rather than a continuous bar: the boss
+  // takes a fixed number of correct reads, and pips say that plainly.
+  const pips = BOSS_MAX_HP;
+  const pipW = w / pips - 4;
+  for (let i = 0; i < pips; i++) {
+    const px = x + i * (pipW + 4);
+    if (i < boss.hp) {
+      ctx.fillStyle = palette.hudText;
+      ctx.fillRect(px, y, pipW, 6);
+    } else {
+      ctx.strokeStyle = palette.hudDim;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 0.5, y + 0.5, pipW - 1, 5);
+    }
+  }
+
+  // Currently exposed colour.
+  const cx = viewW / 2;
+  drawDiamond(ctx, cx, y + 30, 10, palette[boss.weak], 1, 16);
+
+  // Countdown ring around it, so the window's remaining time is visible.
+  ctx.strokeStyle = palette[boss.weak];
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(cx, y + 30, 17, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - windowProgress()));
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  if (!isTelegraphing()) return;
+
+  // Telegraphed next colour, to the right with an arrow.
+  ctx.strokeStyle = palette.hudDim;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx + 26, y + 30);
+  ctx.lineTo(cx + 40, y + 30);
+  ctx.moveTo(cx + 35, y + 25);
+  ctx.lineTo(cx + 40, y + 30);
+  ctx.lineTo(cx + 35, y + 35);
+  ctx.stroke();
+
+  const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 70);
+  drawDiamond(ctx, cx + 54, y + 30, 8, palette[boss.next], pulse, 12 * pulse);
+}
+
+function drawDiamond(ctx, x, y, size, color, alpha, glow) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = glow;
+  ctx.beginPath();
+  ctx.moveTo(0, -size);
+  ctx.lineTo(size, 0);
+  ctx.lineTo(0, size);
+  ctx.lineTo(-size, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /**

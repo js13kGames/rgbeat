@@ -12,7 +12,9 @@
     "size": "node tools/size.mjs",
     "clean": "node tools/clean.mjs",
     "preview": "node tools/build.mjs --preview",
-    "check:level": "node tools/check-level.mjs"
+    "check:level": "node tools/check-level.mjs",
+    "check:balance": "node tools/check-balance.mjs",
+    "check": "npm run check:level && npm run check:balance"
   },
   "devDependencies": {
     "@gfx/zopfli": "^1.0.15",

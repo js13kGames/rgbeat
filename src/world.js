@@ -27,11 +27,22 @@ import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
  * (that is a Phase 8 optimisation, not a design decision).
  */
 const LEVEL = {
-  width: 3200,
+  width: 3800,
   height: 900,
   /** Y of the death plane; falling past this counts as a hazard (Section 5). */
   killY: 1100,
   spawn: { x: 120, y: 500 },
+
+  /**
+   * Where the boss arena begins. Crossing this starts the fight, and dying
+   * inside it restarts from here rather than from the level start.
+   *
+   * Section 15 leaves that choice open; restarting the whole level after every
+   * boss attempt would be miserable in a jam-length game, and this is much
+   * cheaper than the general checkpoint system Section 13 defers to P2.
+   */
+  bossArenaX: 3280,
+  bossSpawn: { x: 3560, y: 640 },
   /**
    * Every surface here is authored against the jump envelope in config.js:
    * no rise exceeds LEDGE_STEP_MAX and no gap exceeds GAP_MAX, both of which
@@ -42,7 +53,7 @@ const LEVEL = {
     // Ground, broken by two gaps the player must jump (130 px and 140 px).
     { x: 0, y: 640, w: 600, h: 260 },
     { x: 730, y: 640, w: 550, h: 260 },
-    { x: 1420, y: 640, w: 1780, h: 260 },
+    { x: 1420, y: 640, w: 2380, h: 260 },
 
     // Ledges. Each rises at most ~100 px from the surface below it.
     //
@@ -69,9 +80,15 @@ const LEVEL = {
 };
 
 /**
- * Background silhouettes: the stolen-colour city, drawn as flat shapes at two
- * parallax depths. Each carries a latent hue that only appears once colour is
+ * Background silhouettes: the stolen-colour city, drawn as flat shapes behind
+ * a parallax offset. Each carries a latent hue that only appears once colour is
  * restored -- this is what makes the boss-defeat recolour land (Section 7).
+ *
+ * NOTE ON AUTHORING RANGE: because of parallax, these x values are not level
+ * positions. A layer at `depth` only ever shows x values in
+ * [0, cameraMax * depth + viewWidth] -- roughly 0..1800 here. Entries beyond
+ * that are never on screen no matter where the player stands, so the skyline is
+ * authored densely across that band rather than stretched along the level.
  */
 const BACKDROP = [
   // [x, y, w, h, depth(0..1), latent hue]
@@ -84,11 +101,6 @@ const BACKDROP = [
   [1260, 330, 120, 310, 0.35, '#3f7a6a'],
   [1500, 200, 85, 440, 0.35, '#8a7a4a'],
   [1720, 310, 105, 330, 0.35, '#4a6ea8'],
-  [1960, 250, 90, 390, 0.35, '#5b4a8a'],
-  [2200, 340, 125, 300, 0.35, '#3f7a6a'],
-  [2450, 210, 80, 430, 0.35, '#8a5a4a'],
-  [2700, 300, 115, 340, 0.35, '#4a6ea8'],
-  [2950, 260, 95, 380, 0.35, '#6a4a8a'],
 ];
 
 /** Latent hue of the terrain itself, revealed by restoration. */
@@ -288,11 +300,21 @@ function drawBackdrop(ctx, view, t) {
 
   for (let i = 0; i < BACKDROP.length; i++) {
     const [x, y, w, h, depth, hue] = BACKDROP[i];
-    // Parallax: distant shapes move less than the camera.
-    const px = x - view.x * depth;
 
-    // Cull offscreen columns.
-    if (px + w < view.x - 200 || px > view.x + view.w + 200) continue;
+    // Parallax. These are drawn inside the camera transform, which has already
+    // translated by -view.x, so the offset must ADD back the part of the camera
+    // motion the layer should not follow:
+    //
+    //   on-screen position = px - view.x = x - view.x * depth
+    //
+    // Subtracting view.x * depth here instead made backdrops move at 1.35x the
+    // camera -- faster than the foreground, which is inverted parallax, and it
+    // ran the backdrop off the end of the level before the boss arena.
+    const px = x + view.x * (1 - depth);
+
+    // Cull offscreen columns, in screen space.
+    const screenX = px - view.x;
+    if (screenX + w < -200 || screenX > view.w + 200) continue;
 
     ctx.fillStyle = mixColor(palette.fogFar, hue, t * 0.7);
     ctx.fillRect(px, y, w, h);
