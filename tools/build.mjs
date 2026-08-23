@@ -18,12 +18,26 @@
  * pays off once we are genuinely tight on bytes (GDD Section 14).
  */
 import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, watch } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import * as esbuild from 'esbuild';
 import { minify } from 'terser';
 import { report, formatBytes, ZIP_PATH } from './size.mjs';
 
 // ./zip.mjs is imported lazily inside build(): it pulls in the Zopfli WASM
 // module, which the dev and preview servers have no use for.
+
+/**
+ * The project root, derived from this file's own location rather than from
+ * process.cwd(). The build must not care which directory it was invoked from --
+ * editors, task runners and launch configs all pick their own working
+ * directory, and a cwd-relative build breaks in confusing ways when they
+ * disagree.
+ */
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Run everything from the project root so relative paths below are stable.
+process.chdir(ROOT);
 
 const ENTRY = 'src/main.js';
 const HTML_SOURCE = 'src/index.html';
@@ -40,9 +54,17 @@ const isDev = args.includes('--dev');
 const isPreview = args.includes('--preview');
 const useRoadroller = args.includes('--roadroller');
 
-/** Shared esbuild settings. Bundling only -- Terser does the actual squeezing. */
+/**
+ * Shared esbuild settings. Bundling only -- Terser does the actual squeezing.
+ *
+ * `absWorkingDir` is set explicitly: esbuild captures the working directory
+ * when its service process starts, which happens at import time and therefore
+ * before the process.chdir() above. Relying on chdir alone silently resolves
+ * entry points against whatever directory the build was invoked from.
+ */
 const esbuildOptions = {
   entryPoints: [ENTRY],
+  absWorkingDir: ROOT,
   bundle: true,
   format: 'iife',
   target: 'es2020',
