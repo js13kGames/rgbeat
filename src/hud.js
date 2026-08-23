@@ -115,6 +115,14 @@ function drawUltimateBar(ctx, x, y, elapsed) {
     ctx.fillRect(x, y, fill, h);
     ctx.shadowBlur = 0;
   }
+
+  // Key hint. The ultimate is the one action with no on-screen button of its
+  // own, so without this its binding is undiscoverable.
+  ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('R', x + w + 9, y + h / 2);
 }
 
 function drawAbilityButton(ctx, x, y, key) {

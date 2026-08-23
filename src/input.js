@@ -34,20 +34,32 @@ const KEY_MAP = {
   KeyW: 'w',
   KeyE: 'e',
   // The GDD does not assign the ultimate a key (Section 4.3 describes only the
-  // ability). Space is the obvious free binding: the arrows are movement and
-  // aim, Q/W/E are the combo grammar, and Space reads as "the big one".
-  Space: 'ult',
+  // ability). R sits directly beside the Q/W/E ability row, so the whole combat
+  // vocabulary stays under one hand.
+  KeyR: 'ult',
 };
 
-/** Arrow keys scroll the page by default; the game needs them. */
-function shouldPreventDefault(code) {
-  return code in KEY_MAP;
+/**
+ * Should the browser's own handling be suppressed?
+ *
+ * Arrow keys scroll the page, so the game must claim them. Every mapped key is
+ * claimed for consistency -- but only when no modifier is held, otherwise
+ * binding KeyR would swallow Ctrl+R and break reloading the page.
+ */
+function shouldPreventDefault(event) {
+  return event.code in KEY_MAP && !hasModifier(event);
+}
+
+function hasModifier(event) {
+  return event.ctrlKey || event.metaKey || event.altKey;
 }
 
 addEventListener('keydown', (event) => {
   const name = KEY_MAP[event.code];
   if (!name) return;
-  if (shouldPreventDefault(event.code)) event.preventDefault();
+  // A modified press is a browser shortcut, not gameplay input.
+  if (hasModifier(event)) return;
+  if (shouldPreventDefault(event)) event.preventDefault();
   // Ignore auto-repeat: a held key must not re-trigger a combo press.
   if (event.repeat) return;
   held[name] = true;
@@ -57,7 +69,9 @@ addEventListener('keydown', (event) => {
 addEventListener('keyup', (event) => {
   const name = KEY_MAP[event.code];
   if (!name) return;
-  if (shouldPreventDefault(event.code)) event.preventDefault();
+  if (shouldPreventDefault(event)) event.preventDefault();
+  // Always release, even if a modifier is now held: the key really is up, and
+  // skipping this would leave it stuck down.
   held[name] = false;
 });
 
