@@ -41,21 +41,21 @@ const MIXES = {
 };
 
 /**
- * Ability names, per GDD Section 4.1. Names are flavour, but they are also how
- * the archetype distinction stays legible to the player -- the two combos that
- * share a hit-colour differ in feel, not in effect on enemies.
+ * The nine ability names from GDD Section 4.1, kept as documentation rather
+ * than as data:
+ *
+ *   Q>Q Aqua Pulse     Q>W Violet Ward     Q>E Frost Snare
+ *   W>W Ember Strike   W>Q Amethyst Dash   W>E Blaze Burst
+ *   E>E Vine Lash      E>Q Tidal Sweep     E>W Solar Lash
+ *
+ * They were shipped as a runtime table until it was noticed that nothing ever
+ * displays them -- no HUD element, no toast, nothing. That cost 128 bytes of
+ * zip for strings the player could never see. As a comment they cost nothing,
+ * because Terser strips them, and they still document the design.
+ *
+ * If a future revision shows ability names in the HUD, this comes back as a
+ * table; until then it stays here.
  */
-const NAMES = {
-  qq: 'Aqua Pulse',
-  ww: 'Ember Strike',
-  ee: 'Vine Lash',
-  qw: 'Violet Ward',
-  wq: 'Amethyst Dash',
-  qe: 'Frost Snare',
-  eq: 'Tidal Sweep',
-  we: 'Blaze Burst',
-  ew: 'Solar Lash',
-};
 
 /**
  * The full 9-combo table, derived rather than hand-written so the grammar can
@@ -74,7 +74,6 @@ for (const first of KEYS) {
     ABILITIES[first + second] = {
       archetype: ARCHETYPE[first],
       color: first === second ? a : MIXES[a + b],
-      name: NAMES[first + second],
       keys: first === second ? [first] : [first, second],
     };
   }

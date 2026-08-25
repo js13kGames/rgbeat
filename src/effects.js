@@ -37,7 +37,6 @@ export function spawnEffect(ability, x, y) {
   effects.push({
     archetype: ability.archetype,
     color: ability.color,
-    name: ability.name,
     x,
     y,
     aimX: ability.aimX,
@@ -62,7 +61,6 @@ export function spawnUltimateEffect(x, y) {
     archetype: 'ultimate',
     ultimate: true,
     color: null,
-    name: 'Spectrum Break',
     x,
     y,
     aimX: 1,
