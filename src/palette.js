@@ -152,15 +152,20 @@ export function loadPaletteMode() {
   }
 }
 
+/** Persist the current mode. Separate so the menu can set then save. */
+export function savePaletteMode() {
+  try {
+    localStorage.setItem(STORAGE_KEY, paletteMode);
+  } catch (e) {
+    /* preference simply will not persist */
+  }
+}
+
 /** Advance to the next mode and persist it. Returns the new mode's name. */
 export function cyclePaletteMode() {
   const next = PALETTE_MODES[(PALETTE_MODES.indexOf(paletteMode) + 1) % PALETTE_MODES.length];
   setPaletteMode(next);
-  try {
-    localStorage.setItem(STORAGE_KEY, next);
-  } catch (e) {
-    /* preference simply will not persist */
-  }
+  savePaletteMode();
   return next;
 }
 

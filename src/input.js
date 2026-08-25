@@ -22,6 +22,7 @@ export const held = {
   ult: false,
   mute: false,
   palette: false,
+  confirm: false,
 };
 
 /** Keys that went down this frame. Cleared by `endFrame()`. */
@@ -42,8 +43,11 @@ const KEY_MAP = {
   // Music now plays from the first bar, so a way to silence it is not optional.
   KeyM: 'mute',
   // Section 10 asks for the colourblind mode to be selectable independently of
-  // any other setting; with no menu in the byte budget, C cycles it directly.
+  // any other setting. The title screen is the primary place that happens; C
+  // cycles it mid-run too, for a player who only notices the problem in play.
   KeyC: 'palette',
+  Enter: 'confirm',
+  Space: 'confirm',
 };
 
 /**

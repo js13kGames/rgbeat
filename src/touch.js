@@ -42,6 +42,16 @@ let moveStartX = 0;
 let moveStartY = 0;
 let jumpLatched = false;
 
+/**
+ * Optional handler consulted before any game control. The title screen uses it
+ * so a tap on a menu row is not also read as a movement drag.
+ */
+let tapHandler = null;
+
+export function onTap(fn) {
+  tapHandler = fn;
+}
+
 /** Which ability key each active pointer is holding, by pointer id. */
 const buttonPointers = new Map();
 
@@ -58,6 +68,8 @@ export function initTouch(canvas, getViewSize) {
     canvas.setPointerCapture(e.pointerId);
 
     const view = getViewSize();
+
+    if (tapHandler && tapHandler(e.clientX, e.clientY, view.w, view.h)) return;
 
     // The ultimate has no button of its own and there is no R key on touch, so
     // its bar doubles as the control. Generous padding: it is a thin graphic.

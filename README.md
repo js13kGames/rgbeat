@@ -21,6 +21,7 @@ single source of truth for mechanics, combat, audio, accessibility and scope.
 | **R** | Ultimate — a full-spectrum explosion that ignores colour matching. Needs a full bar. |
 | **M** | Mute / unmute all audio. |
 | **C** | Cycle colourblind palette (default → protanopia → deuteranopia → tritanopia). Saved between sessions. |
+| **↑ ↓ / Enter** | Title screen: choose a row, and start. ← → cycles the palette from either row. |
 
 Each of Q, W and E has its own cooldown. A pure combo (`Q→Q`) spends one; a mixed
 combo (`Q→W`) spends both, which is what makes secondary colours more expensive to
@@ -126,10 +127,10 @@ It is held in reserve rather than used. Measured on the current build:
 
 | | zip | headroom |
 | --- | --- | --- |
-| default (Terser only) | 10,989 B | 2,323 B |
-| `build:roadroller` | 9,718 B | 3,594 B |
+| default (Terser only) | 12,896 B | 416 B |
+| `build:roadroller` | 11,239 B | 2,073 B |
 
-So there is **~1.27 KB of additional headroom available on demand** if a late feature needs
+So there is **~1.6 KB of additional headroom available on demand** if a late feature needs
 it. Reach for this before cutting anything from the GDD's scope list.
 
 ---
@@ -198,12 +199,15 @@ src/              readable game source (ES modules), the thing humans edit
   ultimate.js     the ultimate bar and its two-tier charge rule (Section 4.3)
   audio.js        synthesised SFX and the dynamic music system (Section 8)
   hud.js          HUD (Section 11)
+  menu.js         title screen: play, and the palette choice
+  logo.js         GENERATED wordmark pixels — see tools/encode-logo.mjs
 tools/            build and verification tooling — zero shipped bytes
   build.mjs       the pipeline: dev server, preview server, production build
   zip.mjs         minimal ZIP writer with Zopfli compression
   size.mjs        byte-budget reporting, also runnable standalone
   check-level.mjs proves every ledge and gap is reachable, by simulation
   check-balance.mjs proves the Section 4.2 timing constraint holds
+  encode-logo.mjs encodes the title wordmark from the reference art
   clean.mjs       removes build output
 docs/
   RGBeat_GDD_1.md   the Game Design Document — source of truth

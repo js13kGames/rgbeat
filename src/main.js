@@ -72,7 +72,8 @@ import {
 } from './audio.js';
 import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
-import { initTouch } from './touch.js';
+import { updateMenu, drawMenu, tapMenu } from './menu.js';
+import { initTouch, onTap } from './touch.js';
 import { DASH_IMPULSE } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
@@ -110,10 +111,27 @@ let elapsed = 0;
 /** Previous frame's armed state, for detecting arm/cancel transitions. */
 let wasArmed = false;
 
-startLevel();
-// Neither accessibility nor audio settings have an on-screen control, so the
-// opening hint is the only thing that makes them discoverable.
-showToast('C: colourblind palette    M: sound', 0, 6);
+/**
+ * Which screen is live. The title screen owns its own input and rendering, so
+ * the game loop simply routes to one or the other rather than the world having
+ * to know it is paused.
+ */
+let inMenu = true;
+
+// On touch there are no arrow keys to drive the menu, so taps go to it first.
+onTap((x, y, w, h) => {
+  if (!inMenu) return false;
+  if (tapMenu(x, y, w, h)) beginGame();
+  return true;
+});
+
+function beginGame() {
+  inMenu = false;
+  startLevel();
+  // The title screen already offered the palette, so this only has to cover
+  // what it did not: the in-run shortcuts.
+  showToast('M: sound    C: palette', elapsed, 5);
+}
 
 function startLevel() {
   revivePlayer();
@@ -128,6 +146,16 @@ function startLevel() {
 function update(dt) {
   elapsed += dt;
   updateJitter(elapsed);
+
+  if (inMenu) {
+    if (updateMenu(pressed)) beginGame();
+    // The title screen has its own calm bed: the same engine at zero intensity,
+    // so starting the game is a rise rather than the music beginning.
+    setMusicTheme('level');
+    setMusicIntensity(0);
+    updateMusic();
+    return;
+  }
 
   // The combo system runs first, because arming a combo takes the arrow keys
   // away from movement for the rest of this frame (GDD Section 3.1, step 2).
@@ -296,6 +324,11 @@ function restartBossFight() {
 }
 
 function render() {
+  if (inMenu) {
+    drawMenu(ctx, viewW, viewH, elapsed);
+    return;
+  }
+
   ctx.save();
   applyCamera(ctx);
 
