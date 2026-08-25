@@ -127,7 +127,7 @@ It is held in reserve rather than used. Measured on the current build:
 
 | | zip | headroom |
 | --- | --- | --- |
-| default (Terser only) | 12,896 B | 416 B |
+| default (Terser only) | 12,665 B | 647 B |
 | `build:roadroller` | 11,239 B | 2,073 B |
 
 So there is **~1.6 KB of additional headroom available on demand** if a late feature needs
