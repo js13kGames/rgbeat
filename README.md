@@ -71,10 +71,10 @@ npm install
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server on <http://localhost:8080> with file watching and sourcemaps. Unminified, fast rebuilds. |
-| `npm run build` | Production build: bundle → minify → inline → zip → size check. Output in `dist/`. |
+| `npm run build` | Production build: bundle → minify → **Roadroller** → inline → zip → size check. Output in `dist/`. Takes ~40s. |
 | `npm run preview` | Serves the built `dist/` over HTTP on <http://localhost:8081>. |
 | `npm run size` | Re-checks the size of the last build without rebuilding. |
-| `npm run build:roadroller` | Production build with Roadroller packing enabled (see below). |
+| `npm run build:fast` | Same, but skips Roadroller. Quick iteration; the size it reports is a pessimistic upper bound, not the shipped figure. |
 | `npm run clean` | Removes `dist/` and `dist-dev/`. |
 
 Always verify the game via `npm run preview` rather than opening `dist/index.html` directly —
@@ -92,7 +92,7 @@ src/*.js
    │
    ├─ esbuild ──────► one IIFE bundle (no module overhead in the output)
    ├─ Terser ───────► aggressive minification, toplevel mangling, 4 compress passes
-   ├─ Roadroller ───► optional, off by default (see below)
+   ├─ Roadroller ───► packed (on by default; --fast skips it)
    ├─ inline ───────► JS injected into a minified copy of src/index.html
    └─ zip ──────────► dist/rgbeat.zip, then checked against the 13 KiB budget
 ```
@@ -119,19 +119,27 @@ This gets us the same class of result ECT/advzip would, with no native binary.
 
 ### Roadroller
 
-[Roadroller](https://lifthrasiir.github.io/roadroller/) is wired up but **disabled by default**.
-It packs JavaScript very well, but makes the shipped output unreadable in devtools and adds
-noticeable time to every build, so it stays opt-in via `npm run build:roadroller`.
-
-It is held in reserve rather than used. Measured on the current build:
+[Roadroller](https://lifthrasiir.github.io/roadroller/) is **on by default**. It was held in
+reserve while there was slack — it makes the shipped output unreadable in devtools and adds
+~40s to a build — but at 94% of the budget with levels and art still to come, the reserve is
+what the project needs.
 
 | | zip | headroom |
 | --- | --- | --- |
-| default (Terser only) | 12,665 B | 647 B |
-| `build:roadroller` | 11,239 B | 2,073 B |
+| `build:fast` (Terser only) | 12,537 B | 775 B |
+| **`build` (Roadroller)** | **11,009 B** | **2,303 B** |
 
-So there is **~1.6 KB of additional headroom available on demand** if a late feature needs
-it. Reach for this before cutting anything from the GDD's scope list.
+The second, less obvious reason it matters: **Roadroller compresses the numeric level data far
+better than deflate does.** Measured by adding two levels' worth of geometry and enemies:
+
+| | cost of 2 extra levels |
+| --- | --- |
+| Terser + deflate | +306 B |
+| Roadroller | **+98 B** |
+
+So content is close to free — roughly 50–150 B per level rather than ~250 B. Budget planning
+should use the Roadroller figure; `build:fast` reports a pessimistic upper bound, useful for
+quick iteration but not the number that ships.
 
 ---
 

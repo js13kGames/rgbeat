@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "node tools/build.mjs --dev",
     "build": "node tools/build.mjs",
-    "build:roadroller": "node tools/build.mjs --roadroller",
+    "build:fast": "node tools/build.mjs --fast",
     "size": "node tools/size.mjs",
     "clean": "node tools/clean.mjs",
     "preview": "node tools/build.mjs --preview",

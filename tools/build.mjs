@@ -3,19 +3,25 @@
  *
  *   src/*.js  --esbuild-->  one IIFE bundle
  *             --terser-->   minified
- *             --roadroller-> (optional, off by default; see --roadroller)
+ *             --roadroller-> packed (on by default; --fast skips it)
  *             --inline-->   single self-contained dist/index.html
  *             --zip-->      dist/rgbeat.zip, checked against the 13 KiB budget
  *
  * Usage:
  *   node tools/build.mjs              production build + size report
+ *   node tools/build.mjs --fast       same, but skip Roadroller (quick iteration)
  *   node tools/build.mjs --dev        dev server with watch + sourcemaps
  *   node tools/build.mjs --preview    serve the built dist/ over http
- *   node tools/build.mjs --roadroller production build, Roadroller enabled
  *
- * Roadroller is deliberately opt-in. It packs the JS well, but it costs ~1 KB of
- * decoder stub and makes the shipped output unreadable in devtools, so it only
- * pays off once we are genuinely tight on bytes (GDD Section 14).
+ * Roadroller is ON by default. It was opt-in while there was slack, because it
+ * makes the shipped output unreadable in devtools and adds ~40s to a build --
+ * but measured on this project it is worth 1.4 KB, and it compresses the
+ * numeric level data far better than deflate does (2 levels of content cost
+ * 306 B through Terser alone, 98 B through Roadroller). At 94% of the budget
+ * with levels and art still to come, that is no longer optional.
+ *
+ * Use --fast while iterating; the size it reports is a pessimistic upper bound,
+ * not the shipped figure.
  */
 import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, watch } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +58,9 @@ const SCRIPT_TAG = '<script src="./game.js"></script>';
 const args = process.argv.slice(2);
 const isDev = args.includes('--dev');
 const isPreview = args.includes('--preview');
-const useRoadroller = args.includes('--roadroller');
+// Roadroller is on unless explicitly skipped, so the number the build reports
+// is the number that actually ships.
+const useRoadroller = !args.includes('--fast');
 
 /**
  * Shared esbuild settings. Bundling only -- Terser does the actual squeezing.
@@ -178,9 +186,10 @@ async function build() {
   let code = minified.code;
   const minifiedSize = Buffer.byteLength(code);
 
-  // 3. Roadroller (opt-in)
+  // 3. Roadroller. On by default; --fast skips it.
   let roadrolledSize = null;
   if (useRoadroller) {
+    console.log('  packing with Roadroller (use --fast to skip)...');
     const { Packer } = await import('roadroller');
     const packer = new Packer([{ data: code, type: 'js', action: 'eval' }], {});
     await packer.optimize(2);
