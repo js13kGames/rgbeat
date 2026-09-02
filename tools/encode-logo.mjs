@@ -57,10 +57,24 @@ const CROP = { x: 0.18, y: 0.06, w: 0.66, h: 0.19 };
 const TARGET_W = 132;
 
 /**
- * The wordmark's four colours, taken from the poster rather than derived.
+ * The wordmark's four colours AS THEY APPEAR IN THE POSTER.
+ *
+ * These are only used to decide which of the four each downscaled pixel
+ * belongs to. They are not what gets drawn -- see PALETTE below.
  * Index 0 is transparent, so these occupy indices 1-4.
  */
-const PALETTE = ['#e8622a', '#3ea34b', '#1a86e8', '#f2f3f7'];
+const SOURCE_COLORS = ['#e8622a', '#3ea34b', '#1a86e8', '#f2f3f7'];
+
+/**
+ * The colours actually drawn, in the same order.
+ *
+ * The poster letters the R in orange, but the title is the game's own colour
+ * grammar spelled out: R, G and B are the three primaries the entire combo
+ * system is built on. So they take the exact red, green and blue that
+ * HIT_COLORS uses in default mode -- the same three swatches shown under the
+ * menu -- and only 'eat' keeps the poster's off-white.
+ */
+const PALETTE = ['#ff2d55', '#2bff88', '#2d8cff', '#f2f3f7'];
 
 /** Anything darker than this is the paint splash, not lettering. */
 const SPLASH_MAX = 70;
@@ -153,7 +167,7 @@ width = maxX - minX + 1;
 height = maxY - minY + 1;
 
 // --- Map to the fixed palette -----------------------------------------------
-const rgb = PALETTE.map((hex) => [
+const rgb = SOURCE_COLORS.map((hex) => [
   parseInt(hex.slice(1, 3), 16),
   parseInt(hex.slice(3, 5), 16),
   parseInt(hex.slice(5, 7), 16),
@@ -172,10 +186,112 @@ function nearest(p) {
   return best + 1; // index 0 is transparent
 }
 
-let encoded = '';
-for (let i = 0; i < pixels.length; i++) {
-  encoded += transparent[i] ? '0' : String(nearest(pixels[i]));
+let indices = pixels.map((p, i) => (transparent[i] ? 0 : nearest(p)));
+
+// --- Drop the decorative waveform ------------------------------------------
+/**
+ * The poster draws a soundwave squiggle trailing off the wordmark. It is not
+ * part of the lettering and it is the most expensive thing left in the grid:
+ * a wide scatter of isolated pixels in all three letter colours, which is
+ * exactly the high-entropy shape deflate cannot do anything with.
+ *
+ * It is also cleanly separable. Every letter is a compact blob, while the
+ * waveform is one long connected streak -- so any component more than three
+ * times wider than it is tall is the waveform, not a letter. The rule is a
+ * ratio rather than a pixel region so it survives the poster being
+ * re-exported at a different size.
+ */
+function components() {
+  const seen = new Uint8Array(width * height);
+  const found = [];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const start = y * width + x;
+      if (!indices[start] || seen[start]) continue;
+
+      const stack = [[x, y]];
+      const pixelsIn = [];
+      seen[start] = 1;
+      let x0 = x;
+      let x1 = x;
+      let y0 = y;
+      let y1 = y;
+
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        pixelsIn.push(cy * width + cx);
+        if (cx < x0) x0 = cx;
+        if (cx > x1) x1 = cx;
+        if (cy < y0) y0 = cy;
+        if (cy > y1) y1 = cy;
+
+        // 8-connected: the lettering is diagonal in places and would
+        // otherwise split into pieces.
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = cx + dx;
+            const ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            const ni = ny * width + nx;
+            if (seen[ni] || !indices[ni]) continue;
+            seen[ni] = 1;
+            stack.push([nx, ny]);
+          }
+        }
+      }
+
+      found.push({ pixels: pixelsIn, w: x1 - x0 + 1, h: y1 - y0 + 1 });
+    }
+  }
+
+  return found;
 }
+
+let waveformPixels = 0;
+for (const c of components()) {
+  if (c.w <= c.h * 3) continue;
+  for (const i of c.pixels) indices[i] = 0;
+  waveformPixels += c.pixels.length;
+}
+
+// --- Snap letter edges onto one colour --------------------------------------
+/**
+ * The box downscale averages source pixels, so a pixel straddling the edge of
+ * a letter averages that letter with whatever is behind it and can land
+ * nearest to the WRONG entry in the palette. The result is a speckle of green
+ * along the R and of blue along the G -- invisible at poster size, obvious
+ * when each pixel is drawn ~6x.
+ *
+ * A majority vote over each pixel's 5x5 neighbourhood puts every speckle back
+ * on the letter that surrounds it, without touching a boundary where two
+ * letters genuinely meet. Two passes settle it; a third changes nothing.
+ */
+for (let pass = 0; pass < 2; pass++) {
+  const before = indices.slice();
+  const sample = (x, y) =>
+    x < 0 || y < 0 || x >= width || y >= height ? 0 : before[y * width + x];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (!before[i]) continue;
+
+      const votes = [0, 0, 0, 0, 0];
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) votes[sample(x + dx, y + dy)]++;
+      }
+
+      // Transparent neighbours do not get a vote: they would erode thin
+      // strokes rather than recolour them.
+      let best = before[i];
+      for (let c = 1; c <= PALETTE.length; c++) if (votes[c] > votes[best]) best = c;
+      indices[i] = best;
+    }
+  }
+}
+
+const encoded = indices.join('');
 
 // --- Emit -------------------------------------------------------------------
 writeFileSync(
@@ -209,5 +325,6 @@ console.log('  source      ' + png.width + 'x' + png.height);
 console.log('  encoded     ' + width + 'x' + height + ' = ' + encoded.length + ' chars');
 console.log('  palette     ' + PALETTE.length + ' colours + transparent');
 console.log('  ink         ' + ((opaque / encoded.length) * 100).toFixed(0) + '% of the grid');
+console.log('  waveform    ' + waveformPixels + ' px dropped');
 console.log('  wrote       ' + OUTPUT);
 console.log('');
