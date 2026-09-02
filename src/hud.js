@@ -308,12 +308,9 @@ function drawAbilityButton(ctx, x, y, key) {
     ctx.fillText(key.toUpperCase(), 0, r + 16);
   }
 
-  // Remaining seconds, so the cooldown is a readout and not just a gauge.
-  if (!ready) {
-    ctx.fillStyle = palette.hudDim;
-    ctx.font = '10px monospace';
-    ctx.fillText(cooldowns[key].toFixed(1), 0, 0);
-  }
+  // There used to be a numeric countdown here. At the old 1.8s cooldown it was
+  // useful; at 0.35s it is an unreadable flicker, so the radial sweep carries
+  // the state on its own.
 
   ctx.restore();
 }

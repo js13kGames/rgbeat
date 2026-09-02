@@ -86,14 +86,24 @@ export const INK = {
 export const AIM_WINDOW = 0.7;
 
 /**
- * Per-key cooldown. Uniform across Q/W/E for now, per the Section 15
- * recommendation; the table shape allows diverging them if balance needs it.
+ * Per-key cooldown.
  *
- * Section 4.2 sets a hard constraint on this value: the player must reliably
- * land at least one valid hit inside every boss weak-colour window. That check
- * happens when the boss lands, and this number is expected to move then.
+ * Started at the 1.8s Section 15 suggests, and that was simply too long: with a
+ * 0.7s aim window and two keys per combo, most of a fight was spent waiting,
+ * which read as the game being unresponsive rather than as a resource to
+ * manage.
+ *
+ * 0.35s is short enough to be nearly imperceptible while still doing the one
+ * job Section 4.2 actually needs it for: you cannot answer the same colour
+ * twice instantly, so a mixed combo still costs more than a pure one and the
+ * colour economy survives.
+ *
+ * Section 4.2's hard constraint still applies and still holds -- but the boss
+ * and volatile windows had to shrink with it, or they became free. Changing
+ * this number without re-running `npm run check:balance` is how the boss fight
+ * silently becomes trivial.
  */
-export const COOLDOWN = { q: 1.8, w: 1.8, e: 1.8 };
+export const COOLDOWN = { q: 0.35, w: 0.35, e: 0.35 };
 
 /**
  * Reach of each mechanic archetype, in px.
@@ -177,10 +187,18 @@ export const BOSS_HEIGHT = 120;
 export const BOSS_SPEED = 74;
 
 /**
- * Hits needed to kill the boss. One per colour in a full rotation, so beating
- * it requires the entire combo vocabulary rather than one favourite ability.
+ * Hits needed to kill the boss.
+ *
+ * Was 6 -- one per colour in a rotation -- which was the right number when a
+ * cooldown was 1.8s and each hit therefore took a couple of seconds to set up.
+ * At 0.35s that made the whole fight about three seconds, which is not a boss.
+ *
+ * 10 restores the length (~5.5s against a competent player, measured) without
+ * changing the mechanic: the shuffled bag still guarantees every colour comes
+ * up, so beating it still requires the entire vocabulary. It just asks for it
+ * closer to twice over.
  */
-export const BOSS_MAX_HP = 6;
+export const BOSS_MAX_HP = 10;
 
 /**
  * How long each weak-colour window lasts.
@@ -190,18 +208,30 @@ export const BOSS_MAX_HP = 6;
  * cooldown. The worst case is a secondary colour needing two keys that both
  * just went on cooldown, so this must comfortably exceed COOLDOWN plus the
  * time to execute a two-key combo. `npm run check:balance` proves it.
+ *
+ * It shrank from 3.6s to 1.6s when the cooldown dropped to 0.35s. That is not
+ * an unrelated tweak: the window was sized around the old 1.8s cooldown, and
+ * left at 3.6s it would have handed the player two and a half free seconds per
+ * colour, turning a reaction check into a formality.
  */
-export const BOSS_WEAK_WINDOW = 3.6;
+export const BOSS_WEAK_WINDOW = 2;
 
 /**
  * How long before a switch the next colour is shown. Section 6.4 wants this to
  * read as a reaction check, not a memorisation test, so the upcoming colour is
  * always telegraphed.
  */
-export const BOSS_TELEGRAPH = 1.2;
+export const BOSS_TELEGRAPH = 0.8;
 
-/** Seconds the boss is stunned and flashing after taking a hit. */
-export const BOSS_HIT_STUN = 0.4;
+/**
+ * Seconds the boss is staggered after a hit: it flashes AND cannot be hit
+ * again. This paces the fight independently of the player cooldowns, which is
+ * what keeps it a fight now that a cooldown is only 0.35s.
+ *
+ * The weak window must exceed this plus the worst-case time to answer a
+ * colour, or a window could pass entirely inside the stagger.
+ */
+export const BOSS_HIT_STUN = 0.6;
 
 // --- Volatile enemies (GDD Section 6.3) -------------------------------------
 /**
@@ -212,4 +242,4 @@ export const BOSS_HIT_STUN = 0.4;
  * enemy is not a tension spike, it is a wall. `npm run check:balance` verifies
  * this alongside the boss timing.
  */
-export const VOLATILE_SHIFT_TIME = 3.2;
+export const VOLATILE_SHIFT_TIME = 1.8;

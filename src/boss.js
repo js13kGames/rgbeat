@@ -50,6 +50,8 @@ export const boss = {
   timer: BOSS_WEAK_WINDOW,
   dir: -1,
   flash: 0,
+  /** Seconds of post-hit invulnerability remaining. */
+  stagger: 0,
   phase: 0,
   alive: false,
   /** True once the player has entered the arena and the fight has begun. */
@@ -83,6 +85,7 @@ export function spawnBoss() {
   boss.next = drawFromBag();
   boss.timer = BOSS_WEAK_WINDOW;
   boss.flash = 0;
+  boss.stagger = 0;
   boss.dir = -1;
   boss.alive = true;
   boss.engaged = false;
@@ -112,6 +115,7 @@ export function updateBoss(dt, playerX) {
 
   boss.phase += dt;
   if (boss.flash > 0) boss.flash -= dt;
+  if (boss.stagger > 0) boss.stagger -= dt;
 
   // Pace the arena, turning at its edges and at the level bound.
   boss.x += boss.dir * BOSS_SPEED * dt;
@@ -141,6 +145,17 @@ export function updateBoss(dt, playerX) {
 export function resolveBossHits(onHit, onDefeat) {
   if (!bossActive()) return false;
 
+  // Staggered: briefly untouchable after taking a hit.
+  //
+  // This is what gives the fight its rhythm, and it became necessary when the
+  // cooldown dropped to 0.35s. Before that, the cooldown itself paced the
+  // fight; afterwards, a player who alternated keys could answer consecutive
+  // colours with no wait at all and the whole fight collapsed to under two
+  // seconds. The stagger paces the boss independently of the player's
+  // cooldowns, so the fight length no longer depends on which colours happen
+  // to come up.
+  if (boss.stagger > 0) return false;
+
   let wrong = false;
 
   for (const effect of effects) {
@@ -159,6 +174,7 @@ export function resolveBossHits(onHit, onDefeat) {
 
     boss.hp--;
     boss.flash = BOSS_HIT_STUN;
+    boss.stagger = BOSS_HIT_STUN;
     onHit(boss);
 
     if (boss.hp <= 0) {

@@ -19,6 +19,7 @@ import {
   COOLDOWN,
   BOSS_WEAK_WINDOW,
   BOSS_TELEGRAPH,
+  BOSS_HIT_STUN,
   AIM_WINDOW,
   VOLATILE_SHIFT_TIME,
 } from '../src/config.js';
@@ -74,7 +75,7 @@ for (const color of HIT_COLORS) {
   const keys = keysFor[color];
   const wait = Math.max(...keys.map((k) => COOLDOWN[k]));
   const total = wait + EXECUTION_TIME;
-  const slack = BOSS_WEAK_WINDOW - total;
+  const slack = BOSS_WEAK_WINDOW - BOSS_HIT_STUN - total;
 
   const label =
     color.padEnd(7) +
@@ -88,7 +89,7 @@ for (const color of HIT_COLORS) {
     total.toFixed(2) +
     's';
 
-  if (slack < 0) fail(label + '  EXCEEDS the ' + BOSS_WEAK_WINDOW + 's window');
+  if (slack < 0) fail(label + '  EXCEEDS the usable window');
   else if (slack < MIN_SLACK) fail(label + '  only ' + slack.toFixed(2) + 's slack (min ' + MIN_SLACK + ')');
   else console.log('  ok    ' + label + '  slack ' + slack.toFixed(2) + 's');
 }
@@ -110,7 +111,9 @@ function simulateFight(sequence) {
 
   for (const color of sequence) {
     const keys = keysFor[color];
-    const windowStart = time;
+    // A landed hit staggers the boss, so the window that follows one is
+    // shorter than the full BOSS_WEAK_WINDOW by that much.
+    const windowStart = time + (results.length ? BOSS_HIT_STUN : 0);
     const windowEnd = time + BOSS_WEAK_WINDOW;
 
     // Earliest moment every required key is ready.
