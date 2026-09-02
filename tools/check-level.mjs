@@ -23,7 +23,7 @@ import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
 } from '../src/config.js';
-import { level, loadLevel, LEVEL_COUNT } from '../src/world.js';
+import { level, loadLevel, LEVEL_COUNT, overlapsSolid } from '../src/world.js';
 import { player, updatePlayer } from '../src/player.js';
 
 const maxHeight = (JUMP_VELOCITY * JUMP_VELOCITY) / (2 * GRAVITY);
@@ -203,6 +203,35 @@ function checkLevel(index) {
   const arenaWidth = level.width - level.bossArenaX;
   if (arenaWidth < 300) fail('boss arena is only ' + arenaWidth + ' px wide');
   else console.log('\n  ok    boss arena ' + arenaWidth + ' px wide');
+
+  // Dying to the boss puts the player back at the arena mouth. On level 2 that
+  // spot was inside a pillar, so the player respawned embedded in terrain and
+  // could not move at all -- indistinguishable from the game hanging. The
+  // respawn now searches backwards for a clear, grounded spot; this proves the
+  // search finds one, and that it does not leave the player inside the arena.
+  const respawnY = level.bossSpawn.y - PLAYER_HEIGHT;
+  let respawnX = null;
+  for (let back = 0; back <= 400 && respawnX === null; back += 10) {
+    const candidate = level.bossArenaX - 60 - back;
+    if (
+      !overlapsSolid(candidate, respawnY, PLAYER_WIDTH, PLAYER_HEIGHT) &&
+      overlapsSolid(candidate, respawnY + 1, PLAYER_WIDTH, PLAYER_HEIGHT)
+    ) {
+      respawnX = candidate;
+    }
+  }
+
+  if (respawnX === null) {
+    fail('no clear boss respawn spot within 400 px of the arena mouth');
+  } else if (respawnX >= level.bossArenaX) {
+    fail('boss respawn at x=' + respawnX + ' is inside the arena');
+  } else {
+    const nudge = level.bossArenaX - 60 - respawnX;
+    console.log(
+      '  ok    boss respawn clear at x=' + respawnX +
+        (nudge ? ' (stepped back ' + nudge + ' px out of terrain)' : '')
+    );
+  }
 }
 
 // --- Run --------------------------------------------------------------------

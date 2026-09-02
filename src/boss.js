@@ -190,12 +190,25 @@ function updateAttack(dt) {
 function slam() {
   const feet = boss.y + boss.h;
   for (const dir of [-1, 1]) {
-    shockwaves.push({ x: boss.x + boss.w / 2, y: feet, dir, travelled: 0 });
+    // `w: 0` is not decorative. The caller derives a knockback origin from
+    // `x + w / 2`, and a wave without a width made that NaN, which silently
+    // sent every shockwave knockback in the same direction.
+    shockwaves.push({ x: boss.x + boss.w / 2, y: feet, w: 0, dir, travelled: 0 });
   }
 }
 
-/** Does any shockwave overlap this rect? Used for contact damage. */
+/**
+ * Does any shockwave overlap this rect? Used for contact damage.
+ *
+ * The `boss.alive` guard matters: updateBoss() returns early once the boss is
+ * dead, so waves stop moving and stop being drawn -- but they were still being
+ * tested for damage, which meant an invisible, motionless wave kept hurting the
+ * player after the fight was over. The waves are cleared on defeat as well;
+ * this guard is the belt to that braces.
+ */
 export function shockwaveHitting(rect) {
+  if (!boss.alive) return null;
+
   for (const w of shockwaves) {
     if (
       rect.x < w.x + 16 &&
@@ -253,6 +266,10 @@ export function resolveBossHits(onHit, onDefeat) {
 
     if (boss.hp <= 0) {
       boss.alive = false;
+      // Any wave still in flight dies with it. Otherwise it freezes in place
+      // (updateBoss stops running) and keeps hurting the player through the
+      // victory, invisibly.
+      shockwaves.length = 0;
       onDefeat(boss);
       return wrong;
     }

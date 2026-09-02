@@ -27,6 +27,7 @@ import {
   loadLevel,
   levelIndex,
   LEVEL_COUNT,
+  overlapsSolid,
 } from './world.js';
 import { updateJitter } from './render.js';
 import { updateCombo, isArmed, resetCombo, combo, cooldowns } from './combo.js';
@@ -360,9 +361,33 @@ function restartBossFight() {
   resetCombo();
   clearEffects();
   spawnBoss();
-  // Put the player back at the arena mouth, already engaged.
-  player.x = level.bossArenaX - 60;
+  // Put the player back at the arena mouth, just short of re-engaging.
   player.y = level.bossSpawn.y - player.h;
+  player.x = clearRespawnX(level.bossArenaX - 60, player.y);
+}
+
+/**
+ * Find a spot at or left of `x` that the player can actually stand in.
+ *
+ * The arena mouth used to be a fixed `bossArenaX - 60`, and on level 2 that
+ * landed exactly inside a pillar: the player respawned embedded in terrain and
+ * could not move in any direction, which reads as the entire game freezing
+ * rather than as a bad respawn.
+ *
+ * Nudging that one pillar would have fixed the symptom and left the next level
+ * edit free to reintroduce it, so the respawn searches instead -- stepping back
+ * toward the way the player came until the body is clear of terrain and has
+ * ground beneath it. `npm run check:level` proves such a spot exists on every
+ * level, so the fallback at the end is unreachable in shipped content.
+ */
+function clearRespawnX(x, y) {
+  for (let back = 0; back <= 400; back += 10) {
+    const candidate = x - back;
+    const clear = !overlapsSolid(candidate, y, player.w, player.h);
+    const grounded = overlapsSolid(candidate, y + 1, player.w, player.h);
+    if (clear && grounded) return candidate;
+  }
+  return x;
 }
 
 function render() {
@@ -405,9 +430,39 @@ if (__DEV__) {
     held,
     killLog,
     boss,
-    // The boss does not exist yet, so the dramatic restoration beat is
-    // triggerable directly for now. Phase 5 hooks it to the boss's death.
     triggerBossRestoration,
+
+    /**
+     * Advance the simulation by hand.
+     *
+     * Browsers throttle requestAnimationFrame to nothing when a tab is not
+     * compositing, which makes the game untestable from an automated harness --
+     * the loop simply stops. This drives update() directly so a test can
+     * reproduce a bug deterministically regardless of what the tab is doing.
+     */
+    step: (dt) => update(dt),
+
+    /** Draw one frame by hand. Paired with step(), this is the whole loop. */
+    draw: () => render(),
+
+    /** Jump straight to a level, to test its geometry without playing to it. */
+    goToLevel: (i) => {
+      inMenu = false;
+      loadLevel(i);
+      startLevel();
+    },
+
+    // Getters, not values: these change over a run, and a plain property would
+    // freeze whatever they happened to be when this object was built.
+    get levelIndex() {
+      return levelIndex;
+    },
+    get inMenu() {
+      return inMenu;
+    },
+    get levelTransition() {
+      return levelTransition;
+    },
   };
 }
 
