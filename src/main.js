@@ -55,6 +55,8 @@ import {
   resolveBossHits,
   bossTouching,
   bossActive,
+  drawBossAttack,
+  shockwaveHitting,
 } from './boss.js';
 import {
   initAudio,
@@ -221,7 +223,7 @@ function update(dt) {
   if (resolveBossHits(onBossHit, onBossDefeated)) sfxResist();
 
   // Contact damage (Section 5). Enemies have no ranged attacks by design.
-  const toucher = enemyTouching(player) || bossTouching(player);
+  const toucher = enemyTouching(player) || bossTouching(player) || shockwaveHitting(player);
   if (toucher && damagePlayer(toucher.x + toucher.w / 2)) {
     sfxHurt();
     addShake(7);
@@ -376,6 +378,7 @@ function render() {
   drawWorld(ctx, view);
   drawEnemies(ctx, view);
   drawBoss(ctx, view, restorationAmount());
+  drawBossAttack(ctx);
   drawEffects(ctx);
   drawPlayer(ctx);
   drawComboIndicator(ctx, player);

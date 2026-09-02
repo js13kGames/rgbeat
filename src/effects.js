@@ -248,21 +248,48 @@ function drawAssault(ctx, t, color, effect) {
   const len = ABILITY_RANGE.assault * (0.55 + t * 0.6);
   const halfW = ASSAULT_HALF_WIDTH * (1 - t * 0.55);
 
+  // Speed lines trailing the strike. Assault is the archetype that MOVES the
+  // player, and the old lens shape read as static; these sell the lunge that
+  // the mechanic is actually doing.
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = (1 - t) * 0.55;
+  for (let i = 0; i < 4; i++) {
+    const off = (i - 1.5) * halfW * 0.55;
+    const back = len * (0.15 + i * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(-back * 0.8, off);
+    ctx.lineTo(len * (0.45 + t * 0.3), off * 0.35);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1 - t;
+
   const grad = ctx.createLinearGradient(0, 0, len, 0);
   grad.addColorStop(0, 'transparent');
   grad.addColorStop(0.6, color);
   grad.addColorStop(1, 'transparent');
   ctx.fillStyle = grad;
 
-  // A lens shape: wide at the middle, tapering to a point at both ends.
+  // A spearhead rather than a symmetrical lens: the leading edge is sharp and
+  // the tail drags, so the direction of the lunge reads instantly.
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(len * 0.5, -halfW, len, 0);
-  ctx.quadraticCurveTo(len * 0.5, halfW, 0, 0);
+  ctx.moveTo(-len * 0.18, 0);
+  ctx.quadraticCurveTo(len * 0.45, -halfW, len, 0);
+  ctx.quadraticCurveTo(len * 0.45, halfW, -len * 0.18, 0);
   ctx.fill();
 
+  // Impact sparks at the tip, thrown back along the strike.
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + t * 3;
+    const r = halfW * (0.6 + t * 2.4);
+    ctx.beginPath();
+    ctx.moveTo(len + Math.cos(a) * r * 0.35, Math.sin(a) * r * 0.35);
+    ctx.lineTo(len + Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+
   ctx.beginPath();
   ctx.arc(len, 0, halfW * 0.5 * (1 - t), 0, Math.PI * 2);
   ctx.stroke();

@@ -29,9 +29,14 @@ import {
   BOSS_WEAK_WINDOW,
   BOSS_TELEGRAPH,
   BOSS_HIT_STUN,
+  BOSS_ATTACK_INTERVAL,
+  BOSS_ATTACK_WINDUP,
+  SHOCKWAVE_SPEED,
+  SHOCKWAVE_RANGE,
+  SHOCKWAVE_HEIGHT,
   INK,
 } from './config.js';
-import { palette, HIT_COLORS } from './palette.js';
+import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { level } from './world.js';
 import { effects, effectOverlaps } from './effects.js';
 import { inkRect, mixColor, drawGlyph } from './render.js';
@@ -52,11 +57,26 @@ export const boss = {
   flash: 0,
   /** Seconds of post-hit invulnerability remaining. */
   stagger: 0,
+  /** Seconds until the next slam. */
+  attackTimer: BOSS_ATTACK_INTERVAL,
+  /** Seconds of wind-up left; > 0 means the slam is being telegraphed. */
+  windup: 0,
   phase: 0,
   alive: false,
   /** True once the player has entered the arena and the fight has begun. */
   engaged: false,
 };
+
+/**
+ * Live shockwaves. Each travels along the arena floor away from the boss.
+ *
+ * GDD Section 5 permits the boss an attack only if it is deliberately designed
+ * and TELEGRAPHED, and warns against ranged attacks arriving by accident. This
+ * is deliberately a ground wave rather than a projectile: it is cleared with
+ * the jump the player already has, so it pressures positioning without
+ * interfering with the colour reading the fight is actually about.
+ */
+export const shockwaves = [];
 
 /** Shuffled bag of colours, refilled when empty. */
 let bag = [];
@@ -86,6 +106,9 @@ export function spawnBoss() {
   boss.timer = BOSS_WEAK_WINDOW;
   boss.flash = 0;
   boss.stagger = 0;
+  boss.attackTimer = BOSS_ATTACK_INTERVAL;
+  boss.windup = 0;
+  shockwaves.length = 0;
   boss.dir = -1;
   boss.alive = true;
   boss.engaged = false;
@@ -133,6 +156,57 @@ export function updateBoss(dt, playerX) {
     boss.next = drawFromBag();
     boss.timer = BOSS_WEAK_WINDOW;
   }
+
+  updateAttack(dt);
+}
+
+/**
+ * The slam: wind up visibly, then send a wave along the floor each way.
+ *
+ * The wind-up is the whole point. Section 5 asks for the attack to be
+ * telegraphed, and an untelegraphed area attack in a fight that already demands
+ * the player watch a colour would just feel arbitrary.
+ */
+function updateAttack(dt) {
+  if (boss.windup > 0) {
+    boss.windup -= dt;
+    if (boss.windup <= 0) slam();
+  } else {
+    boss.attackTimer -= dt;
+    if (boss.attackTimer <= 0) {
+      boss.windup = BOSS_ATTACK_WINDUP;
+      boss.attackTimer = BOSS_ATTACK_INTERVAL;
+    }
+  }
+
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const w = shockwaves[i];
+    w.x += w.dir * SHOCKWAVE_SPEED * dt;
+    w.travelled += SHOCKWAVE_SPEED * dt;
+    if (w.travelled > SHOCKWAVE_RANGE) shockwaves.splice(i, 1);
+  }
+}
+
+function slam() {
+  const feet = boss.y + boss.h;
+  for (const dir of [-1, 1]) {
+    shockwaves.push({ x: boss.x + boss.w / 2, y: feet, dir, travelled: 0 });
+  }
+}
+
+/** Does any shockwave overlap this rect? Used for contact damage. */
+export function shockwaveHitting(rect) {
+  for (const w of shockwaves) {
+    if (
+      rect.x < w.x + 16 &&
+      rect.x + rect.w > w.x - 16 &&
+      rect.y + rect.h > w.y - SHOCKWAVE_HEIGHT &&
+      rect.y < w.y
+    ) {
+      return w;
+    }
+  }
+  return null;
 }
 
 /**
@@ -318,4 +392,58 @@ function drawWeakCore(ctx, cx, cy) {
   ctx.fill();
 
   ctx.restore();
+}
+
+/**
+ * The wind-up tell and the waves themselves.
+ *
+ * The tell is drawn on the boss (a compressing crouch plus a bright rim) rather
+ * than as a separate icon, so the player reads it from the same place they are
+ * already watching for the weak colour.
+ */
+export function drawBossAttack(ctx) {
+  if (!boss.alive) return;
+
+  // Wind-up: a rising glow under the boss that snaps shut on the slam.
+  if (boss.windup > 0) {
+    const charge = 1 - boss.windup / BOSS_ATTACK_WINDUP;
+    const cx = boss.x + boss.w / 2;
+    const feet = boss.y + boss.h;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.35 + charge * 0.5;
+    const grad = ctx.createRadialGradient(cx, feet, 2, cx, feet, 40 + charge * 60);
+    grad.addColorStop(0, rainbow(charge, 62));
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, feet, 40 + charge * 60, 16 + charge * 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  for (const w of shockwaves) {
+    // Fades as it travels, so its remaining reach is readable.
+    const life = 1 - w.travelled / SHOCKWAVE_RANGE;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = life;
+    ctx.strokeStyle = rainbow(w.travelled / 200, 60);
+    ctx.lineWidth = 3;
+
+    // A leaning crest: a wedge tipped in the direction of travel.
+    ctx.beginPath();
+    ctx.moveTo(w.x - w.dir * 14, w.y);
+    ctx.lineTo(w.x + w.dir * 4, w.y - SHOCKWAVE_HEIGHT * life);
+    ctx.lineTo(w.x + w.dir * 14, w.y);
+    ctx.stroke();
+
+    // Dust at the base.
+    ctx.fillStyle = palette.ink;
+    ctx.globalAlpha = life * 0.5;
+    ctx.fillRect(w.x - 16, w.y - 3, 32, 3);
+    ctx.restore();
+  }
 }

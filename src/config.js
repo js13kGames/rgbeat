@@ -243,3 +243,23 @@ export const BOSS_HIT_STUN = 0.6;
  * this alongside the boss timing.
  */
 export const VOLATILE_SHIFT_TIME = 1.8;
+
+// --- Boss attacks (GDD Section 5) -------------------------------------------
+/**
+ * Section 5 allows the boss an attack, but only on two conditions: that it is
+ * deliberately designed, and that it is TELEGRAPHED. It warns specifically
+ * against ranged attacks arriving as an implementation afterthought.
+ *
+ * So this is a ground shockwave, not a projectile. It travels along the floor
+ * from the boss and is cleared with the jump the player already has, which
+ * means it adds pressure to positioning without touching the colour-reading
+ * loop that the fight is actually about.
+ */
+export const BOSS_ATTACK_INTERVAL = 3.2;
+
+/** Wind-up before the slam. This IS the telegraph, so it cannot be short. */
+export const BOSS_ATTACK_WINDUP = 0.7;
+
+export const SHOCKWAVE_SPEED = 340; // px/s along the ground
+export const SHOCKWAVE_RANGE = 640; // px before it dissipates
+export const SHOCKWAVE_HEIGHT = 26; // low enough that a normal jump clears it
