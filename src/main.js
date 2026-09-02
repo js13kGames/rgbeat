@@ -24,6 +24,9 @@ import {
   triggerBossRestoration,
   setWipeViewport,
   restorationAmount,
+  loadLevel,
+  levelIndex,
+  LEVEL_COUNT,
 } from './world.js';
 import { updateJitter } from './render.js';
 import { updateCombo, isArmed, resetCombo, combo, cooldowns } from './combo.js';
@@ -74,7 +77,7 @@ import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
 import { updateMenu, drawMenu, tapMenu } from './menu.js';
 import { initTouch, onTap } from './touch.js';
-import { DASH_IMPULSE } from './config.js';
+import { DASH_IMPULSE, BOSS_WIPE_DURATION } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -118,6 +121,16 @@ let wasArmed = false;
  */
 let inMenu = true;
 
+/**
+ * Seconds until the next level loads, or 0 when not transitioning.
+ *
+ * The boss's death starts the restoration wipe, and the level must NOT change
+ * until that has played out -- it is the biggest beat in the game (Section 7)
+ * and cutting away from it would throw the payoff away. So the transition is a
+ * timer rather than an immediate swap.
+ */
+let levelTransition = 0;
+
 // On touch there are no arrow keys to drive the menu, so taps go to it first.
 onTap((x, y, w, h) => {
   if (!inMenu) return false;
@@ -127,6 +140,7 @@ onTap((x, y, w, h) => {
 
 function beginGame() {
   inMenu = false;
+  loadLevel(0);
   startLevel();
   // The title screen already offered the palette, so this only has to cover
   // what it did not: the in-run shortcuts.
@@ -134,6 +148,7 @@ function beginGame() {
 }
 
 function startLevel() {
+  levelTransition = 0;
   revivePlayer();
   resetCombo();
   resetUltimate();
@@ -182,6 +197,11 @@ function update(dt) {
   updateEnemies(dt);
   updateBoss(dt, player.x);
   updateRestoration(dt);
+
+  if (levelTransition > 0) {
+    levelTransition -= dt;
+    if (levelTransition <= 0) advanceLevel();
+  }
 
   if (fired) onAbilityFired(fired);
 
@@ -298,6 +318,26 @@ function onBossDefeated(defeated) {
   triggerBossRestoration(defeated.x + defeated.w / 2, defeated.y + defeated.h / 2);
   sfxBossDefeat();
   addShake(22);
+
+  // Let the recolour finish and breathe before the level changes.
+  levelTransition = BOSS_WIPE_DURATION + 1.4;
+}
+
+/** The wipe has played out; move on, or end the game if that was the last boss. */
+function advanceLevel() {
+  const next = levelIndex + 1;
+
+  if (next >= LEVEL_COUNT) {
+    // Every level restored. Back to the title screen, which is where the
+    // wordmark and the full-colour palette live -- a fitting place to land.
+    inMenu = true;
+    showToast('all colour restored  --  thank you for playing', elapsed, 7);
+    return;
+  }
+
+  loadLevel(next);
+  startLevel();
+  showToast('level ' + (next + 1) + ' of ' + LEVEL_COUNT, elapsed, 3);
 }
 
 /**

@@ -28,35 +28,79 @@ import {
 import { palette, MIX, HIT_COLORS, RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
 import { effects, effectOverlaps } from './effects.js';
 import { inkRect, mixColor, drawGlyph } from './render.js';
-import { restorationAmount } from './world.js';
+import { restorationAmount, levelIndex } from './world.js';
 
 /**
  * Level enemy placements.
  *
- * Ordered along the level to teach the grammar in the order Section 12 asks
- * for: primaries first, then secondaries once the player can read a core.
- * `y` is the surface they stand on; the spawn converts it to a body position.
+ * One array per level. Within each, ordered along the level to teach in the
+ * order Section 12 asks for: primaries first, then secondaries once the player
+ * can read a core, then volatile variants in the back half.
+ *
+ * Across levels the difficulty comes from density and from secondaries
+ * arriving sooner -- not from new mechanics, which Section 12 rules out.
+ * `surface` is what they stand on; the spawn converts it to a body position.
  */
 const PLACEMENTS = [
-  // Ground 1 -- a single primary, room to experiment.
-  { x: 430, surface: 640, core: RED, patrol: [370, 560] },
+  // --- Level 1: teach the grammar ------------------------------------------
+  [
+    // A single primary first, with room to experiment.
+    { x: 430, surface: 640, core: RED, patrol: [370, 560] },
 
-  // Ground 2 -- two primaries, then the first secondary.
-  { x: 820, surface: 640, core: BLUE, patrol: [760, 1000] },
-  { x: 960, surface: 545, core: GREEN, patrol: [905, 1050] },
-  { x: 1180, surface: 640, core: ORANGE, patrol: [1090, 1260] },
+    // Two more primaries, then the first secondary.
+    { x: 820, surface: 640, core: BLUE, patrol: [760, 1000] },
+    { x: 960, surface: 545, core: GREEN, patrol: [905, 1050] },
+    { x: 1180, surface: 640, core: ORANGE, patrol: [1090, 1260] },
 
-  // Ground 3 -- secondaries become the norm.
-  { x: 1660, surface: 545, core: BLUE, patrol: [1605, 1770] },
-  { x: 1930, surface: 455, core: PURPLE, patrol: [1885, 2040] },
-  { x: 2260, surface: 545, core: CYAN, patrol: [2205, 2380] },
+    // Secondaries become the norm.
+    { x: 1660, surface: 545, core: BLUE, patrol: [1605, 1770] },
+    { x: 1930, surface: 455, core: PURPLE, patrol: [1885, 2040] },
+    { x: 2260, surface: 545, core: CYAN, patrol: [2205, 2380] },
 
-  // The level's back half, once the grammar is fluent: volatile cores that
-  // shift if left alone (Section 6.3). Used sparingly and only here -- they are
-  // meant to be a spike of tension, not the default enemy.
-  { x: 2520, surface: 455, core: ORANGE, patrol: [2475, 2630], volatile: 1 },
-  { x: 2700, surface: 640, core: GREEN, patrol: [2620, 2780] },
-  { x: 2860, surface: 540, core: PURPLE, patrol: [2805, 2970], volatile: 1 },
+    // Back half only: volatile cores that shift if left alone (Section 6.3),
+    // used sparingly as a spike of tension rather than the default enemy.
+    { x: 2520, surface: 455, core: ORANGE, patrol: [2475, 2630], volatile: 1 },
+    { x: 2700, surface: 640, core: GREEN, patrol: [2620, 2780] },
+    { x: 2860, surface: 540, core: PURPLE, patrol: [2805, 2970], volatile: 1 },
+  ],
+
+  // --- Level 2: denser, secondaries earlier, three volatile ----------------
+  [
+    { x: 380, surface: 640, core: GREEN, patrol: [320, 520] },
+    { x: 200, surface: 545, core: RED, patrol: [165, 300] },
+
+    { x: 900, surface: 640, core: ORANGE, patrol: [760, 1100] },
+    { x: 900, surface: 545, core: BLUE, patrol: [865, 980] },
+
+    { x: 1400, surface: 640, core: CYAN, patrol: [1300, 1560] },
+    { x: 1600, surface: 455, core: PURPLE, patrol: [1565, 1690] },
+    { x: 1800, surface: 640, core: RED, patrol: [1700, 1880] },
+
+    { x: 2300, surface: 545, core: ORANGE, patrol: [2255, 2410], volatile: 1 },
+    { x: 2560, surface: 455, core: CYAN, patrol: [2515, 2660], volatile: 1 },
+    { x: 2870, surface: 545, core: PURPLE, patrol: [2825, 2990] },
+    { x: 3130, surface: 455, core: GREEN, patrol: [3095, 3240], volatile: 1 },
+  ],
+
+  // --- Level 3: four pits, tight footing, mostly secondaries ---------------
+  [
+    { x: 350, surface: 640, core: PURPLE, patrol: [280, 500] },
+    { x: 220, surface: 545, core: BLUE, patrol: [185, 320] },
+
+    { x: 850, surface: 640, core: CYAN, patrol: [700, 1060] },
+    { x: 855, surface: 545, core: RED, patrol: [825, 910] },
+
+    { x: 1400, surface: 640, core: ORANGE, patrol: [1260, 1620] },
+    { x: 1410, surface: 545, core: GREEN, patrol: [1385, 1470] },
+
+    { x: 1990, surface: 545, core: PURPLE, patrol: [1945, 2090], volatile: 1 },
+    { x: 2100, surface: 640, core: CYAN, patrol: [1800, 2240] },
+
+    { x: 2650, surface: 545, core: ORANGE, patrol: [2605, 2760], volatile: 1 },
+    { x: 2910, surface: 455, core: PURPLE, patrol: [2865, 3010], volatile: 1 },
+    { x: 3200, surface: 545, core: CYAN, patrol: [3155, 3320] },
+    { x: 3470, surface: 455, core: ORANGE, patrol: [3425, 3570], volatile: 1 },
+  ],
 ];
 
 /** Live enemies. */
@@ -73,7 +117,7 @@ function isSecondary(color) {
 export function spawnEnemies() {
   enemies.length = 0;
 
-  for (const p of PLACEMENTS) {
+  for (const p of PLACEMENTS[levelIndex]) {
     enemies.push({
       x: p.x,
       y: p.surface - ENEMY_HEIGHT,

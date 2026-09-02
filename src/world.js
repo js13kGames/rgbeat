@@ -20,64 +20,129 @@ import { INK, BOSS_WIPE_DURATION } from './config.js';
 import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
 
 /**
- * Level geometry. Solid rectangles the player collides with.
+ * The levels.
  *
- * Kept as a plain array while the game is being built; it compresses fine in
- * the zip and stays readable. If bytes get tight this becomes a packed string
- * (that is a Phase 8 optimisation, not a design decision).
+ * Every surface is authored against the jump envelope in config.js: no rise
+ * exceeds LEDGE_STEP_MAX and no gap exceeds GAP_MAX, both well under the
+ * theoretical maximum so jumps never feel pixel-perfect. Critically, NO ledge
+ * sits above the run-up to a pit -- a ledge there becomes a ceiling that clips
+ * the jump arc, which is what silently turns an ordinary gap into a
+ * frame-perfect one.
+ *
+ * `npm run check:level` proves all of this for EVERY level by simulating the
+ * real physics. Do not add geometry by eye; add it and run the check.
+ *
+ * Difficulty rises through density, pit count and tighter ledges, not through
+ * new mechanics -- GDD Section 12 is explicit that each level should not
+ * introduce another system.
+ *
+ * `bossArenaX` is where the fight starts; dying inside it restarts the fight
+ * rather than the level (Section 15 leaves that open, and replaying a whole
+ * level after each boss attempt would be miserable in a jam game).
  */
-const LEVEL = {
-  width: 3800,
-  height: 900,
-  /** Y of the death plane; falling past this counts as a hazard (Section 5). */
-  killY: 1100,
-  spawn: { x: 120, y: 500 },
+const LEVELS = [
+  // --- 1. Teaching ground: two pits, generous ledges ------------------------
+  {
+    width: 3800,
+    height: 900,
+    killY: 1100,
+    spawn: { x: 120, y: 500 },
+    bossArenaX: 3280,
+    bossSpawn: { x: 3560, y: 640 },
+    solids: [
+      { x: 0, y: 640, w: 600, h: 260 },
+      { x: 730, y: 640, w: 550, h: 260 },
+      { x: 1420, y: 640, w: 2380, h: 260 },
 
-  /**
-   * Where the boss arena begins. Crossing this starts the fight, and dying
-   * inside it restarts from here rather than from the level start.
-   *
-   * Section 15 leaves that choice open; restarting the whole level after every
-   * boss attempt would be miserable in a jam-length game, and this is much
-   * cheaper than the general checkpoint system Section 13 defers to P2.
-   */
-  bossArenaX: 3280,
-  bossSpawn: { x: 3560, y: 640 },
-  /**
-   * Every surface here is authored against the jump envelope in config.js:
-   * no rise exceeds LEDGE_STEP_MAX and no gap exceeds GAP_MAX, both of which
-   * sit well under the theoretical maximum so jumps never feel pixel-perfect.
-   * `npm run check:level` verifies this; do not add geometry by eye.
-   */
-  solids: [
-    // Ground, broken by two gaps the player must jump (130 px and 140 px).
-    { x: 0, y: 640, w: 600, h: 260 },
-    { x: 730, y: 640, w: 550, h: 260 },
-    { x: 1420, y: 640, w: 2380, h: 260 },
+      { x: 200, y: 548, w: 160, h: 24 },
+      { x: 900, y: 545, w: 160, h: 24 },
+      { x: 980, y: 455, w: 140, h: 24 },
+      { x: 1600, y: 545, w: 180, h: 24 },
+      { x: 1880, y: 455, w: 170, h: 24 },
+      { x: 2200, y: 545, w: 190, h: 24 },
+      { x: 2470, y: 455, w: 170, h: 24 },
+      { x: 2800, y: 540, w: 180, h: 24 },
 
-    // Ledges. Each rises at most ~100 px from the surface below it.
-    //
-    // Critically, NONE of them sits above the run-up to a pit. A ledge over a
-    // gap approach becomes a ceiling that clips the jump arc, which is what
-    // turns an ordinary gap into a pixel-perfect one -- the clearance is
-    // enforced by `npm run check:level`, not left to judgement.
-    { x: 200, y: 548, w: 160, h: 24 }, // +92 from ground
+      // `decor` marks an obstacle that is not part of the route, so the
+      // reachability check does not demand the player be able to land on it.
+      { x: 3040, y: 545, w: 40, h: 95, decor: 1 },
+    ],
+  },
 
-    { x: 900, y: 545, w: 160, h: 24 }, // +95 from ground
-    { x: 980, y: 455, w: 140, h: 24 }, // +90
+  // --- 2. Three pits, and the climbs get narrower ---------------------------
+  {
+    width: 3800,
+    height: 900,
+    killY: 1100,
+    spawn: { x: 110, y: 500 },
+    bossArenaX: 3380,
+    bossSpawn: { x: 3620, y: 640 },
+    solids: [
+      { x: 0, y: 640, w: 560, h: 260 },
+      { x: 700, y: 640, w: 450, h: 260 },
+      { x: 1290, y: 640, w: 610, h: 260 },
+      { x: 2050, y: 640, w: 1750, h: 260 },
 
-    { x: 1600, y: 545, w: 180, h: 24 }, // +95 from ground
-    { x: 1880, y: 455, w: 170, h: 24 }, // +90
-    { x: 2200, y: 545, w: 190, h: 24 }, // +95 from ground
-    { x: 2470, y: 455, w: 170, h: 24 }, // +90
-    { x: 2800, y: 540, w: 180, h: 24 }, // +100 from ground
+      { x: 160, y: 545, w: 150, h: 24 },
+      { x: 860, y: 545, w: 130, h: 24 },
+      { x: 1480, y: 545, w: 160, h: 24 },
+      { x: 1560, y: 455, w: 140, h: 24 },
+      { x: 2250, y: 545, w: 170, h: 24 },
+      { x: 2510, y: 455, w: 160, h: 24 },
+      { x: 2820, y: 545, w: 180, h: 24 },
+      { x: 3090, y: 455, w: 160, h: 24 },
 
-    // A low wall to break up the silhouette near the level's end. `decor` marks
-    // it as an obstacle rather than part of the route, so the reachability
-    // check does not demand that the player be able to land on top of it.
-    { x: 3040, y: 545, w: 40, h: 95, decor: 1 },
-  ],
-};
+      { x: 3300, y: 545, w: 40, h: 95, decor: 1 },
+    ],
+  },
+
+  // --- 3. Four pits and the tightest footing -------------------------------
+  {
+    width: 4100,
+    height: 900,
+    killY: 1100,
+    spawn: { x: 100, y: 500 },
+    bossArenaX: 3650,
+    bossSpawn: { x: 3880, y: 640 },
+    solids: [
+      { x: 0, y: 640, w: 520, h: 260 },
+      { x: 660, y: 640, w: 420, h: 260 },
+      { x: 1225, y: 640, w: 415, h: 260 },
+      { x: 1785, y: 640, w: 475, h: 260 },
+      { x: 2400, y: 640, w: 1700, h: 260 },
+
+      { x: 180, y: 545, w: 150, h: 24 },
+      { x: 820, y: 545, w: 100, h: 24 },
+      { x: 1380, y: 545, w: 100, h: 24 },
+      { x: 1940, y: 545, w: 160, h: 24 },
+      { x: 2600, y: 545, w: 170, h: 24 },
+      { x: 2860, y: 455, w: 160, h: 24 },
+      { x: 3150, y: 545, w: 180, h: 24 },
+      { x: 3420, y: 455, w: 160, h: 24 },
+    ],
+  },
+];
+
+export const LEVEL_COUNT = LEVELS.length;
+
+/** Index of the level currently loaded. */
+export let levelIndex = 0;
+
+/**
+ * The live level.
+ *
+ * Deliberately a single object that `loadLevel` fills in, rather than a
+ * per-level object handed around: every module that needs geometry imports
+ * `level` once and keeps working across level changes, with no plumbing.
+ */
+export const level = {};
+
+export function loadLevel(index) {
+  levelIndex = index;
+  Object.assign(level, LEVELS[index]);
+}
+
+loadLevel(0);
 
 /**
  * Background silhouettes: the stolen-colour city, drawn as flat shapes behind
@@ -106,7 +171,6 @@ const BACKDROP = [
 /** Latent hue of the terrain itself, revealed by restoration. */
 const TERRAIN_HUE = '#2f5a3a';
 
-export const level = LEVEL;
 
 /**
  * Colour restoration state. See the module comment.
@@ -212,7 +276,7 @@ export function addKillRestoration(amount = 0.012) {
 
 /** Does this rect overlap any solid? */
 export function overlapsSolid(x, y, w, h) {
-  for (const s of LEVEL.solids) {
+  for (const s of level.solids) {
     if (x < s.x + s.w && x + w > s.x && y < s.y + s.h && y + h > s.y) return true;
   }
   return false;
@@ -330,8 +394,8 @@ function drawTerrain(ctx, view, t) {
   ctx.lineWidth = INK.lineWidth;
   ctx.lineJoin = 'round';
 
-  for (let i = 0; i < LEVEL.solids.length; i++) {
-    const s = LEVEL.solids[i];
+  for (let i = 0; i < level.solids.length; i++) {
+    const s = level.solids[i];
     if (s.x + s.w < view.x - 100 || s.x > view.x + view.w + 100) continue;
 
     // Body: near-black, barely lifted from the sky.

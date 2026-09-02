@@ -126,8 +126,8 @@ what the project needs.
 
 | | zip | headroom |
 | --- | --- | --- |
-| `build:fast` (Terser only) | 12,537 B | 775 B |
-| **`build` (Roadroller)** | **11,009 B** | **2,303 B** |
+| `build:fast` (Terser only) | 13,082 B | 230 B |
+| **`build` (Roadroller)** | **11,402 B** | **1,910 B** |
 
 The second, less obvious reason it matters: **Roadroller compresses the numeric level data far
 better than deflate does.** Measured by adding two levels' worth of geometry and enemies:
@@ -195,7 +195,7 @@ src/              readable game source (ES modules), the thing humans edit
   config.js       every tunable value, in one place
   palette.js      the central palette + colourblind modes (Sections 9–10)
   render.js       shared ink helpers and the per-colour glyphs
-  world.js        level geometry, collision, ink-wash renderer, restoration
+  world.js        the three levels, collision, ink-wash renderer, restoration
   player.js       platformer physics, health, procedural unicorn
   camera.js       follow camera and screen shake
   input.js        keyboard state

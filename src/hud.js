@@ -20,6 +20,7 @@ import { AIM_WINDOW, MAX_HEARTS, BOSS_MAX_HP } from './config.js';
 import { player } from './player.js';
 import { ultimate, isUltimateReady } from './ultimate.js';
 import { boss, bossActive, windowProgress, isTelegraphing } from './boss.js';
+import { levelIndex, LEVEL_COUNT } from './world.js';
 import { drawGlyph } from './render.js';
 import { isTouch } from './touch.js';
 
@@ -76,6 +77,7 @@ export function drawHud(ctx, viewW, viewH, elapsed) {
   if (isTouch()) drawMoveZone(ctx, viewH);
 
   drawHearts(ctx, 22, 24, elapsed);
+  drawLevelBadge(ctx, viewW);
   drawUltimateBar(ctx, ULT_BAR.x, ULT_BAR.y, elapsed);
   if (bossActive()) drawBossBar(ctx, viewW);
   drawToast(ctx, viewW, viewH, elapsed);
@@ -151,6 +153,15 @@ function drawMarker(ctx, x, y, size, colorName, alpha, glow) {
   drawGlyph(ctx, HIT_COLORS.indexOf(colorName), size);
   ctx.fill();
   ctx.restore();
+}
+
+/** Which level this is, so progress through the game is legible at a glance. */
+function drawLevelBadge(ctx, viewW) {
+  ctx.fillStyle = palette.hudDim;
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.fillText(levelIndex + 1 + ' / ' + LEVEL_COUNT, viewW - 22, 18);
 }
 
 /**
