@@ -57,13 +57,30 @@ const CROP = { x: 0.18, y: 0.06, w: 0.66, h: 0.19 };
 const TARGET_W = 132;
 
 /**
- * The wordmark's four colours AS THEY APPEAR IN THE POSTER.
+ * Where one letter ends and the next begins, as hue in degrees.
  *
- * These are only used to decide which of the four each downscaled pixel
- * belongs to. They are not what gets drawn -- see PALETTE below.
- * Index 0 is transparent, so these occupy indices 1-4.
+ * The poster letters the wordmark as ONE continuous rainbow gradient running
+ * left to right: the R is red through orange to yellow, the G is yellow-green
+ * through green to cyan, the B is cyan through blue to violet, and 'eat' is
+ * white. No letter is a flat colour.
+ *
+ * That is why matching each pixel to the nearest of four fixed colours failed:
+ * it cut every letter in half. The G was the obvious casualty -- its cyan end
+ * landed nearer the blue entry than the green one, so the letter rendered half
+ * green and half blue -- but the R and G also traded pixels along their
+ * boundary, eroding the tip of the G's tail into red.
+ *
+ * Hue is what actually identifies a letter, because each one owns a contiguous
+ * band of the gradient. These thresholds sit in the middle of each transition
+ * rather than at its edge, so a pixel has to be well into the next letter's
+ * band before it changes hands.
  */
-const SOURCE_COLORS = ['#e8622a', '#3ea34b', '#1a86e8', '#f2f3f7'];
+const HUE_RED_GREEN = 68; // past yellow: the R's tail stays warm
+const HUE_GREEN_BLUE = 196; // past cyan: the G's tail stays green
+const HUE_BLUE_RED = 300; // past violet: hue wraps, and the R's darkest red sits near 350
+
+/** Below this saturation a pixel is the white 'eat', not part of the rainbow. */
+const WHITE_MAX_SATURATION = 0.22;
 
 /**
  * The colours actually drawn, in the same order.
@@ -167,26 +184,36 @@ width = maxX - minX + 1;
 height = maxY - minY + 1;
 
 // --- Map to the fixed palette -----------------------------------------------
-const rgb = SOURCE_COLORS.map((hex) => [
-  parseInt(hex.slice(1, 3), 16),
-  parseInt(hex.slice(3, 5), 16),
-  parseInt(hex.slice(5, 7), 16),
-]);
+/**
+ * Hue of an RGB triple, in degrees, or -1 when it is too grey to have one.
+ */
+function hueOf([r, g, b]) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+  if (!max || chroma / max < WHITE_MAX_SATURATION) return -1;
 
-function nearest(p) {
-  let best = 0;
-  let bestD = Infinity;
-  for (let i = 0; i < rgb.length; i++) {
-    const d = (p[0] - rgb[i][0]) ** 2 + (p[1] - rgb[i][1]) ** 2 + (p[2] - rgb[i][2]) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = i;
-    }
-  }
-  return best + 1; // index 0 is transparent
+  let h;
+  if (max === r) h = ((g - b) / chroma) % 6;
+  else if (max === g) h = (b - r) / chroma + 2;
+  else h = (r - g) / chroma + 4;
+
+  h *= 60;
+  return h < 0 ? h + 360 : h;
 }
 
-let indices = pixels.map((p, i) => (transparent[i] ? 0 : nearest(p)));
+/** Which palette entry (1-4) does this pixel's letter use? */
+function classify(p) {
+  const h = hueOf(p);
+  if (h < 0) return 4; // the white 'eat'
+  // Hue is a circle: the R runs from a near-magenta 350 through orange to
+  // yellow, so its darkest end sits ABOVE the blue threshold, not below red.
+  if (h >= HUE_BLUE_RED || h < HUE_RED_GREEN) return 1;
+  if (h < HUE_GREEN_BLUE) return 2;
+  return 3;
+}
+
+let indices = pixels.map((p, i) => (transparent[i] ? 0 : classify(p)));
 
 // --- Drop the decorative waveform ------------------------------------------
 /**
@@ -257,15 +284,15 @@ for (const c of components()) {
 
 // --- Snap letter edges onto one colour --------------------------------------
 /**
- * The box downscale averages source pixels, so a pixel straddling the edge of
- * a letter averages that letter with whatever is behind it and can land
- * nearest to the WRONG entry in the palette. The result is a speckle of green
- * along the R and of blue along the G -- invisible at poster size, obvious
+ * Hue decides which letter a pixel belongs to, but the box downscale averages
+ * source pixels first -- so a pixel straddling the boundary between two letters
+ * averages both, and its blended hue can land on the wrong side of a threshold.
+ * That leaves the odd speckle along a seam: invisible at poster size, obvious
  * when each pixel is drawn ~6x.
  *
  * A majority vote over each pixel's 5x5 neighbourhood puts every speckle back
- * on the letter that surrounds it, without touching a boundary where two
- * letters genuinely meet. Two passes settle it; a third changes nothing.
+ * on the letter that surrounds it, without moving a boundary where two letters
+ * genuinely meet. Two passes settle it; a third changes nothing.
  */
 for (let pass = 0; pass < 2; pass++) {
   const before = indices.slice();
