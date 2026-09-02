@@ -242,8 +242,12 @@ function drawRow(ctx, cx, y, label, active, elapsed) {
     ctx.fillStyle = rainbow(elapsed * 0.25, 66);
     ctx.fillText(label, cx, y);
     const w = ctx.measureText(label).width;
-    ctx.fillText('▸', cx - w / 2 - 22, y);
-    ctx.fillText('◂', cx + w / 2 + 22, y);
+    // Pointing OUTWARD, away from the label. Turned inward they read as a
+    // bracket -- decoration around the current row -- which says nothing about
+    // what the arrow keys do. Outward they read as an invitation to press left
+    // or right, which is exactly the control the menu needs the player to find.
+    ctx.fillText('◂', cx - w / 2 - 22, y);
+    ctx.fillText('▸', cx + w / 2 + 22, y);
   } else {
     ctx.fillStyle = palette.hudDim;
     ctx.fillText(label, cx, y);
