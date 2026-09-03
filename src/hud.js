@@ -19,7 +19,7 @@ import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';
 import { AIM_WINDOW, MAX_HEARTS, BOSS_MAX_HP } from './config.js';
 import { player } from './player.js';
 import { ultimate, isUltimateReady } from './ultimate.js';
-import { boss, bossActive, windowProgress, isTelegraphing } from './boss.js';
+import { boss, bossActive, windowProgress } from './boss.js';
 import { levelIndex, LEVEL_COUNT } from './world.js';
 import { drawGlyph } from './render.js';
 import { isTouch } from './touch.js';
@@ -124,9 +124,11 @@ function drawBossBar(ctx, viewW) {
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  if (!isTelegraphing()) return;
-
   // Telegraphed next colour, to the right with an arrow.
+  //
+  // Shown for the whole window rather than only its last beat, matching the
+  // ring on the boss itself. Two indicators of the same thing appearing at
+  // different moments read as two different signals.
   ctx.strokeStyle = palette.hudDim;
   ctx.lineWidth = 1.5;
   ctx.beginPath();

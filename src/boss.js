@@ -27,19 +27,17 @@ import {
   BOSS_SPEED,
   BOSS_MAX_HP,
   BOSS_WEAK_WINDOW,
-  BOSS_TELEGRAPH,
   BOSS_HIT_STUN,
   BOSS_ATTACK_INTERVAL,
   BOSS_ATTACK_WINDUP,
   SHOCKWAVE_SPEED,
   SHOCKWAVE_RANGE,
   SHOCKWAVE_HEIGHT,
-  INK,
 } from './config.js';
 import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { level } from './world.js';
 import { effects, effectOverlaps } from './effects.js';
-import { inkRect, mixColor, drawGlyph } from './render.js';
+import { mixColor, drawGlyph } from './render.js';
 
 export const boss = {
   x: 0,
@@ -122,11 +120,6 @@ export function bossActive() {
 /** How far through the current window we are, 0..1. */
 export function windowProgress() {
   return 1 - boss.timer / BOSS_WEAK_WINDOW;
-}
-
-/** Is the next colour being telegraphed right now? */
-export function isTelegraphing() {
-  return boss.timer <= BOSS_TELEGRAPH;
 }
 
 export function updateBoss(dt, playerX) {
@@ -329,11 +322,6 @@ export function drawBoss(ctx, view, t) {
   ctx.fillRect(cx - 36, top + 40, 9, 34);
   ctx.fillRect(cx + 27, top + 40, 9, 34);
 
-  ctx.strokeStyle = mixColor(palette.inkFaint, palette.ink, 0.5);
-  ctx.lineWidth = INK.lineWidth;
-  inkRect(ctx, cx - 27, top + 38, 54, 46, boss.x * 0.1);
-  ctx.stroke();
-
   drawColorRing(ctx, cx, top + 58);
   drawWeakCore(ctx, cx, top + 58);
 
@@ -354,18 +342,25 @@ function drawColorRing(ctx, cx, cy) {
     const x = cx + Math.cos(angle) * radius;
     const y = cy + Math.sin(angle) * radius * 0.72;
 
-    const isWeak = color === boss.weak;
-    const isNext = color === boss.next && isTelegraphing();
+    // The ring's job is to answer "what is coming next", and nothing else.
+    //
+    // It used to light the CURRENT colour too, which was redundant -- the core
+    // in the middle of the chest already shows it, far larger and brighter --
+    // and worse, two lit glyphs at once made the player check which of them was
+    // the telegraph. So the active colour sits dormant here like the other
+    // four, and the only thing that moves is the one about to take over.
+    const isNext = color === boss.next;
 
     ctx.save();
     ctx.translate(x, y);
 
-    if (isWeak) {
-      ctx.fillStyle = palette[color];
-      ctx.shadowColor = palette[color];
-      ctx.shadowBlur = 16;
-    } else if (isNext) {
-      // Telegraph: the incoming colour pulses awake before it takes over.
+    if (isNext) {
+      // Pulsing from the moment the core changes, not just in the last beat.
+      // The telegraph used to be gated to the last 0.8s of a window, so for
+      // most of a window the ring said nothing at all and the switch arrived
+      // with barely more warning than a combo takes to execute. Running it the
+      // whole window turns the ring into something the player can plan around
+      // rather than merely react to.
       const pulse = 0.5 + 0.5 * Math.sin(boss.phase * 14);
       ctx.globalAlpha = 0.35 + pulse * 0.65;
       ctx.fillStyle = palette[color];
@@ -379,7 +374,7 @@ function drawColorRing(ctx, cx, cy) {
 
     // Glyph rather than a shared diamond: the ring has to be readable as six
     // distinct colours without relying on hue at all (Section 10).
-    drawGlyph(ctx, i, isWeak ? 7 : 5.5);
+    drawGlyph(ctx, i, isNext ? 7 : 5.5);
     ctx.fill();
     ctx.restore();
   }

@@ -14,20 +14,42 @@ export function addShake(amount) {
   shake = Math.min(shake + amount, 24);
 }
 
-export function updateCamera(dt, target, viewWidth, viewHeight) {
+/**
+ * @param {number} minX Left edge the view is not allowed to pass. 0 normally;
+ *   during a boss fight it is the arena mouth, so the fight is never framed
+ *   with half the screen showing platforms the player already crossed.
+ */
+export function updateCamera(dt, target, viewWidth, viewHeight, minX) {
   camera.w = viewWidth;
   camera.h = viewHeight;
 
-  const wantX = target.x + target.w / 2 + target.facing * CAMERA_LOOKAHEAD - viewWidth / 2;
+  const maxX = level.width - viewWidth;
+
+  let wantX = target.x + target.w / 2 + target.facing * CAMERA_LOOKAHEAD - viewWidth / 2;
+
+  if (minX > maxX) {
+    // The window is wider than the region we are being asked to stay inside,
+    // so there is no framing that satisfies both edges. Centre the region and
+    // accept the overspill rather than snapping to one side of it.
+    wantX = (minX + level.width - viewWidth) / 2;
+  } else {
+    wantX = Math.max(minX, Math.min(maxX, wantX));
+  }
+
   const wantY = target.y + target.h / 2 - viewHeight / 2 - CAMERA_Y_OFFSET;
 
   // Exponential smoothing, framerate-independent.
+  //
+  // The clamp above is applied to the TARGET, not to the camera afterwards.
+  // That distinction is what makes entering the arena a glide instead of a
+  // jump: the camera is roughly 300 px left of the arena mouth at the moment
+  // the fight begins, and clamping the camera itself would teleport it there.
   const k = 1 - Math.exp(-CAMERA_STIFFNESS * dt);
   camera.x += (wantX - camera.x) * k;
   camera.y += (wantY - camera.y) * k;
 
-  // Clamp to the level. If the view is wider than the level, centre it.
-  camera.x = Math.max(0, Math.min(level.width - viewWidth, camera.x));
+  // Final clamp to the level, which the smoothing above can still overshoot.
+  camera.x = Math.max(0, Math.min(maxX, camera.x));
   if (level.width < viewWidth) camera.x = (level.width - viewWidth) / 2;
   camera.y = Math.min(camera.y, level.height - viewHeight);
 

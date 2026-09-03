@@ -36,6 +36,12 @@ import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
  * new mechanics -- GDD Section 12 is explicit that each level should not
  * introduce another system.
  *
+ * The stretch from `bossArenaX` to `width` is the boss arena, and it is sized
+ * to be WIDER than a typical viewport on purpose. At 420-520 units it was
+ * narrower than the window, so the camera could not frame it: it stayed clamped
+ * to the end of the level and spent half the screen showing the platforms the
+ * player had already crossed, while the fight itself happened in a corner.
+ *
  * `bossArenaX` is where the fight starts; dying inside it restarts the fight
  * rather than the level (Section 15 leaves that open, and replaying a whole
  * level after each boss attempt would be miserable in a jam game).
@@ -43,7 +49,7 @@ import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
 const LEVELS = [
   // --- 1. Teaching ground: two pits, generous ledges ------------------------
   {
-    width: 3800,
+    width: 4300,
     height: 900,
     killY: 1100,
     spawn: { x: 120, y: 500 },
@@ -52,7 +58,7 @@ const LEVELS = [
     solids: [
       { x: 0, y: 640, w: 600, h: 260 },
       { x: 730, y: 640, w: 550, h: 260 },
-      { x: 1420, y: 640, w: 2380, h: 260 },
+      { x: 1420, y: 640, w: 2880, h: 260 },
 
       { x: 200, y: 548, w: 160, h: 24 },
       { x: 900, y: 545, w: 160, h: 24 },
@@ -71,7 +77,7 @@ const LEVELS = [
 
   // --- 2. Three pits, and the climbs get narrower ---------------------------
   {
-    width: 3800,
+    width: 4300,
     height: 900,
     killY: 1100,
     spawn: { x: 110, y: 500 },
@@ -81,7 +87,7 @@ const LEVELS = [
       { x: 0, y: 640, w: 560, h: 260 },
       { x: 700, y: 640, w: 450, h: 260 },
       { x: 1290, y: 640, w: 610, h: 260 },
-      { x: 2050, y: 640, w: 1750, h: 260 },
+      { x: 2050, y: 640, w: 2250, h: 260 },
 
       { x: 160, y: 545, w: 150, h: 24 },
       { x: 860, y: 545, w: 130, h: 24 },
@@ -98,7 +104,7 @@ const LEVELS = [
 
   // --- 3. Four pits and the tightest footing -------------------------------
   {
-    width: 4100,
+    width: 4600,
     height: 900,
     killY: 1100,
     spawn: { x: 100, y: 500 },
@@ -109,7 +115,7 @@ const LEVELS = [
       { x: 660, y: 640, w: 420, h: 260 },
       { x: 1225, y: 640, w: 415, h: 260 },
       { x: 1785, y: 640, w: 475, h: 260 },
-      { x: 2400, y: 640, w: 1700, h: 260 },
+      { x: 2400, y: 640, w: 2200, h: 260 },
 
       { x: 180, y: 545, w: 150, h: 24 },
       { x: 820, y: 545, w: 100, h: 24 },

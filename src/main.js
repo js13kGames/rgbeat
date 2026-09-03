@@ -242,7 +242,9 @@ function update(dt) {
     else resetPlayer();
   }
 
-  updateCamera(dt, player, viewW, viewH);
+  // Frame the arena during the fight: the camera stops following the player
+  // backwards out of it, so the whole screen is fighting space.
+  updateCamera(dt, player, viewW, viewH, bossActive() ? level.bossArenaX : 0);
 
   // Dynamic music (Section 8). Intensity is progress toward the boss arena, so
   // the score tightens as the player approaches and the change in intensity

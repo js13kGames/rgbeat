@@ -217,13 +217,6 @@ export const BOSS_MAX_HP = 10;
 export const BOSS_WEAK_WINDOW = 2;
 
 /**
- * How long before a switch the next colour is shown. Section 6.4 wants this to
- * read as a reaction check, not a memorisation test, so the upcoming colour is
- * always telegraphed.
- */
-export const BOSS_TELEGRAPH = 0.8;
-
-/**
  * Seconds the boss is staggered after a hit: it flashes AND cannot be hit
  * again. This paces the fight independently of the player cooldowns, which is
  * what keeps it a fight now that a cooldown is only 0.35s.

@@ -18,7 +18,6 @@
 import {
   COOLDOWN,
   BOSS_WEAK_WINDOW,
-  BOSS_TELEGRAPH,
   BOSS_HIT_STUN,
   AIM_WINDOW,
   VOLATILE_SHIFT_TIME,
@@ -56,7 +55,7 @@ for (const ability of Object.values(ABILITIES)) {
 console.log('\nInputs (from src/config.js and the real combo table)');
 console.log('  per-key cooldown : ' + COOLDOWN.q + 's / ' + COOLDOWN.w + 's / ' + COOLDOWN.e + 's');
 console.log('  weak window      : ' + BOSS_WEAK_WINDOW + 's');
-console.log('  telegraph        : ' + BOSS_TELEGRAPH + 's');
+console.log('  telegraph        : the whole window, ' + BOSS_WEAK_WINDOW + 's');
 console.log('  aim window       : ' + AIM_WINDOW + 's');
 
 console.log('\nKeys required per hit-colour');
@@ -215,13 +214,23 @@ for (const color of HIT_COLORS) {
 }
 
 // --- Telegraph sanity -------------------------------------------------------
-console.log('\nTelegraph');
-if (BOSS_TELEGRAPH >= BOSS_WEAK_WINDOW) {
-  fail('telegraph is as long as the window; the next colour would always show');
-} else if (BOSS_TELEGRAPH < AIM_WINDOW) {
-  fail('telegraph (' + BOSS_TELEGRAPH + 's) is shorter than the aim window; too late to react');
+//
+// The ring used to light the incoming colour only in the last BOSS_TELEGRAPH
+// seconds of a window, so for most of a window it said nothing and the switch
+// arrived with 0.8s of warning. It now pulses the next colour from the moment
+// the core changes, which makes the warning exactly one full window long -- so
+// that is the figure that has to clear the reaction bar.
+console.log('');
+console.log('Telegraph');
+if (BOSS_WEAK_WINDOW < AIM_WINDOW) {
+  fail(
+    'the window (' + BOSS_WEAK_WINDOW + 's) is shorter than the aim window; ' +
+      'the player cannot finish a combo inside the warning'
+  );
 } else {
-  console.log('  ok    ' + BOSS_TELEGRAPH + 's of warning, longer than the ' + AIM_WINDOW + 's aim window');
+  console.log(
+    '  ok    ' + BOSS_WEAK_WINDOW + 's of warning, longer than the ' + AIM_WINDOW + 's aim window'
+  );
 }
 
 console.log('\n' + (failures ? failures + ' PROBLEM(S)' : 'boss timing is beatable') + '\n');
