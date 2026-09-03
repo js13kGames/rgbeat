@@ -33,6 +33,8 @@ import {
   SHOCKWAVE_SPEED,
   SHOCKWAVE_RANGE,
   SHOCKWAVE_HEIGHT,
+  SHOCKWAVE_FAN,
+  SHOCKWAVE_RADIUS,
 } from './config.js';
 import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { level } from './world.js';
@@ -174,19 +176,59 @@ function updateAttack(dt) {
 
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const w = shockwaves[i];
-    w.x += w.dir * SHOCKWAVE_SPEED * dt;
-    w.travelled += SHOCKWAVE_SPEED * dt;
+    w.x += w.vx * dt;
+    w.y += w.vy * dt;
+    w.travelled += Math.hypot(w.vx, w.vy) * dt;
     if (w.travelled > SHOCKWAVE_RANGE) shockwaves.splice(i, 1);
   }
 }
 
+/**
+ * The slam: two waves along the floor, plus a fan of projectiles thrown up and
+ * out from the impact.
+ *
+ * The floor waves alone made the fight one-dimensional -- stand anywhere off
+ * the ground and the attack could not reach you, so the answer was always the
+ * same jump at the same moment. The fan covers the air the player was using to
+ * ignore it, which is what turns "jump on cue" into a positioning problem.
+ *
+ * It is still a fan and not a sphere: nothing is fired downward, and the
+ * spacing leaves gaps wide enough to stand in. An attack with no safe answer
+ * is not a difficulty increase, it is a tax.
+ */
 function slam() {
+  const cx = boss.x + boss.w / 2;
   const feet = boss.y + boss.h;
+
+  // Along the floor. `w: 0` is not decorative: the caller derives a knockback
+  // origin from `x + w / 2`, and a wave without a width made that NaN.
   for (const dir of [-1, 1]) {
-    // `w: 0` is not decorative. The caller derives a knockback origin from
-    // `x + w / 2`, and a wave without a width made that NaN, which silently
-    // sent every shockwave knockback in the same direction.
-    shockwaves.push({ x: boss.x + boss.w / 2, y: feet, w: 0, dir, travelled: 0 });
+    shockwaves.push({
+      x: cx,
+      y: feet,
+      w: 0,
+      vx: dir * SHOCKWAVE_SPEED,
+      vy: 0,
+      ground: 1,
+      travelled: 0,
+    });
+  }
+
+  // The fan, thrown from the boss's chest so it is read as coming FROM the
+  // boss rather than erupting out of the floor.
+  for (let i = 0; i < SHOCKWAVE_FAN; i++) {
+    // Spread across the upper half only, endpoints excluded so no projectile
+    // hugs the floor and duplicates a ground wave.
+    const a = -Math.PI * ((i + 1) / (SHOCKWAVE_FAN + 1));
+    shockwaves.push({
+      x: cx,
+      y: boss.y + boss.h * 0.45,
+      w: 0,
+      vx: Math.cos(a) * SHOCKWAVE_SPEED * 0.85,
+      vy: Math.sin(a) * SHOCKWAVE_SPEED * 0.85,
+      ground: 0,
+      travelled: 0,
+    });
   }
 }
 
@@ -203,11 +245,23 @@ export function shockwaveHitting(rect) {
   if (!boss.alive) return null;
 
   for (const w of shockwaves) {
-    if (
-      rect.x < w.x + 16 &&
-      rect.x + rect.w > w.x - 16 &&
-      rect.y + rect.h > w.y - SHOCKWAVE_HEIGHT &&
-      rect.y < w.y
+    if (w.ground) {
+      // A crest hugging the floor: wide, and only dangerous near the ground.
+      if (
+        rect.x < w.x + 16 &&
+        rect.x + rect.w > w.x - 16 &&
+        rect.y + rect.h > w.y - SHOCKWAVE_HEIGHT &&
+        rect.y < w.y
+      ) {
+        return w;
+      }
+    } else if (
+      // A projectile: a plain box test, since it can arrive from any angle and
+      // the floor-relative test above would never fire on one in mid-air.
+      rect.x < w.x + SHOCKWAVE_RADIUS &&
+      rect.x + rect.w > w.x - SHOCKWAVE_RADIUS &&
+      rect.y < w.y + SHOCKWAVE_RADIUS &&
+      rect.y + rect.h > w.y - SHOCKWAVE_RADIUS
     ) {
       return w;
     }
@@ -443,19 +497,38 @@ export function drawBossAttack(ctx) {
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = life;
     ctx.strokeStyle = rainbow(w.travelled / 200, 60);
+    ctx.fillStyle = ctx.strokeStyle;
     ctx.lineWidth = 3;
 
-    // A leaning crest: a wedge tipped in the direction of travel.
-    ctx.beginPath();
-    ctx.moveTo(w.x - w.dir * 14, w.y);
-    ctx.lineTo(w.x + w.dir * 4, w.y - SHOCKWAVE_HEIGHT * life);
-    ctx.lineTo(w.x + w.dir * 14, w.y);
-    ctx.stroke();
+    if (w.ground) {
+      // A leaning crest: a wedge tipped in the direction of travel.
+      const dir = Math.sign(w.vx) || 1;
+      ctx.beginPath();
+      ctx.moveTo(w.x - dir * 14, w.y);
+      ctx.lineTo(w.x + dir * 4, w.y - SHOCKWAVE_HEIGHT * life);
+      ctx.lineTo(w.x + dir * 14, w.y);
+      ctx.stroke();
 
-    // Dust at the base.
-    ctx.fillStyle = palette.ink;
-    ctx.globalAlpha = life * 0.5;
-    ctx.fillRect(w.x - 16, w.y - 3, 32, 3);
+      // Dust at the base.
+      ctx.globalAlpha = life * 0.5;
+      ctx.fillStyle = palette.ink;
+      ctx.fillRect(w.x - 16, w.y - 3, 32, 3);
+    } else {
+      // A projectile, drawn as a core plus a tail pointing back along its own
+      // path -- which is the only cue the player has for where it came from
+      // once several are in the air at once.
+      const len = SHOCKWAVE_RADIUS * 1.8;
+      const inv = 1 / (Math.hypot(w.vx, w.vy) || 1);
+      ctx.beginPath();
+      ctx.moveTo(w.x - w.vx * inv * len, w.y - w.vy * inv * len);
+      ctx.lineTo(w.x, w.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, SHOCKWAVE_RADIUS * (0.55 + life * 0.45), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 }

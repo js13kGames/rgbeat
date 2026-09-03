@@ -25,7 +25,7 @@ import { RED, GREEN, BLUE, ORANGE, PURPLE, CYAN } from './palette.js';
 export const KEYS = ['q', 'w', 'e'];
 
 /** First key -> mechanic archetype. */
-const ARCHETYPE = { q: 'guard', w: 'assault', e: 'flow' };
+const ARCHETYPE = { q: 'dash', w: 'assault', e: 'flow' };
 
 /** Second key -> the primary colour it contributes. */
 const KEY_COLOR = { q: BLUE, w: RED, e: GREEN };

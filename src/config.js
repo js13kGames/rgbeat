@@ -145,7 +145,10 @@ export const COOLDOWN = { q: 0.35, w: 0.35, e: 0.35 };
  * fell outside the hitbox and the ability felt far shorter than it looked.
  */
 export const ABILITY_RANGE = {
-  guard: 95, // nova radius, centred on the player
+  // The dash's hitbox runs the whole length of the dash, so anything the player
+  // passes through is struck. Derived, not typed: a hand-written number here
+  // would silently stop matching the moment the dash got faster or longer.
+  dash: 0, // replaced below, once DASH_SPEED and DASH_DURATION exist
   assault: 210, // dash-strike length, clearing the dash's own travel
   flow: 150, // arc sweep radius
 };
@@ -153,8 +156,26 @@ export const ABILITY_RANGE = {
 /** How long an ability's visual effect lives, in seconds. */
 export const EFFECT_LIFETIME = 0.32;
 
-/** Forward impulse applied to the player by Assault (dash) abilities. */
+/** Forward impulse applied to the player by Assault abilities. */
 export const DASH_IMPULSE = 460;
+
+// --- Dash (the blue archetype) ----------------------------------------------
+/**
+ * The dash is the one ability that is a MOVEMENT option first and a strike
+ * second: it crosses ground fast, passes through whatever it hits, and grants
+ * invulnerability for its whole length plus a short tail.
+ *
+ * That tail is the part that makes it a skill rather than a panic button. 0.2s
+ * is long enough to dash THROUGH an attack and land safely on the far side --
+ * the thing the player is actually trying to do -- but far too short to dash
+ * early and still be covered when the attack arrives.
+ */
+export const DASH_DURATION = 0.5;
+export const DASH_SPEED = 900; // px/s -- 3.2x a normal run
+export const DASH_IFRAME_TAIL = 0.2; // s of cover after the dash ends
+
+// The dash's reach IS the ground it covers.
+ABILITY_RANGE.dash = DASH_SPEED * DASH_DURATION;
 
 // --- Player health (GDD Section 5) ------------------------------------------
 /** Starting hearts. Section 15 recommends 4. */
@@ -287,3 +308,20 @@ export const BOSS_ATTACK_WINDUP = 0.7;
 export const SHOCKWAVE_SPEED = 340; // px/s along the ground
 export const SHOCKWAVE_RANGE = 640; // px before it dissipates
 export const SHOCKWAVE_HEIGHT = 26; // low enough that a normal jump clears it
+
+/**
+ * Projectiles thrown up and out alongside the two floor waves.
+ *
+ * Floor waves alone made the slam one-dimensional: anywhere off the ground was
+ * safe, so the answer was always the same jump on the same cue. The fan covers
+ * that air. Odd numbers leave a projectile heading straight up, which reads as
+ * a burst rather than as two separate diagonal volleys.
+ *
+ * Raising it closes the gaps between projectiles; past about 9 there is no
+ * standing room left in the fan, and an attack with no safe answer is a tax
+ * rather than a difficulty increase.
+ */
+export const SHOCKWAVE_FAN = 5;
+
+/** Half-size of a fan projectile's hitbox. */
+export const SHOCKWAVE_RADIUS = 13;

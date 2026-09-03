@@ -94,7 +94,7 @@ export function drawHud(ctx, viewW, viewH, elapsed) {
 
   if (isTouch()) drawMoveZone(ctx, viewH);
 
-  drawHearts(ctx, 22, 24, elapsed);
+  drawHearts(ctx, 26, 30);
   drawLevelBadge(ctx, viewW);
   const up = ultimateButtonPos(viewW, viewH);
   drawUltimateButton(ctx, up.x, up.y, elapsed);
@@ -193,9 +193,13 @@ function drawLevelBadge(ctx, viewW) {
  * six hit-colours -- so this reads from `rainbow()` rather than the palette's
  * colour slots, and the cycle is continuous rather than landing on named hues.
  */
-function drawHearts(ctx, x, y, elapsed) {
-  const size = 9;
-  const gap = 24;
+function drawHearts(ctx, x, y) {
+  // Red, not a rainbow. Health is the one readout that must never be mistaken
+  // for a colour REQUIREMENT: every other coloured thing on screen names a
+  // combo the player has to answer with, and hearts that cycled through the
+  // same six hues were speaking the game's own vocabulary without meaning it.
+  const size = 13;
+  const gap = 32;
 
   for (let i = 0; i < MAX_HEARTS; i++) {
     const filled = i < player.hearts;
@@ -205,8 +209,8 @@ function drawHearts(ctx, x, y, elapsed) {
     ctx.translate(hx, y);
 
     if (filled) {
-      ctx.fillStyle = rainbow(elapsed * 0.12 + i / MAX_HEARTS, 62);
-      ctx.shadowColor = rainbow(elapsed * 0.12 + i / MAX_HEARTS, 62);
+      ctx.fillStyle = palette.red;
+      ctx.shadowColor = palette.red;
       ctx.shadowBlur = 8;
     } else {
       ctx.strokeStyle = palette.hudDim;
@@ -354,20 +358,24 @@ function drawAbilityButton(ctx, x, y, key) {
     ctx.shadowBlur = 0;
   }
 
-  // The key's own colour glyph. Filled when ready, hollow while recharging --
-  // a shape difference, so cooldown state does not rely on colour alone, and
-  // the glyph itself teaches which shape this key's colour produces.
-  const size = r * 0.44;
-  drawGlyph(ctx, HIT_COLORS.indexOf(KEY_COLOR[key]), size);
-
-  if (ready) {
-    ctx.fillStyle = color;
-    ctx.fill();
-  } else {
-    ctx.strokeStyle = palette.hudDim;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
+  // What the key DOES, not what colour it is.
+  //
+  // These used to be the key's colour glyph, which taught the second half of
+  // the grammar (Q means blue) and said nothing about the first (Q means
+  // dash). The colour glyphs are still everywhere they carry weight -- enemy
+  // cores, the boss ring, the effect itself -- so the button is free to teach
+  // the mechanic instead, which is the half a new player cannot guess.
+  //
+  // Section 10's rule survives: the three icons are distinct SHAPES, so which
+  // key is which never depends on telling three hues apart.
+  ctx.strokeStyle = ready ? color : palette.hudDim;
+  ctx.fillStyle = ready ? color : palette.hudDim;
+  ctx.globalAlpha = ready ? 1 : 0.55;
+  ctx.lineWidth = ready ? 3 : 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  archetypeIcon(ctx, key, r * 0.5);
+  ctx.globalAlpha = 1;
 
   // Key cap.
   if (!isTouch()) {
@@ -383,6 +391,53 @@ function drawAbilityButton(ctx, x, y, key) {
   // the state on its own.
 
   ctx.restore();
+}
+
+/**
+ * The icon for what a key's archetype does.
+ *
+ * Drawn rather than stored: three shapes at this size cost less as code than
+ * as any encoded form, and they have to recolour per palette mode anyway.
+ *
+ *   q  dash        chevrons, stacked into an arrow of travel
+ *   w  projectile  a head with a tail, mid-flight
+ *   e  wave        concentric arcs spreading outward
+ */
+function archetypeIcon(ctx, key, s) {
+  if (key === 'q') {
+    // Two chevrons: one alone reads as "next", two read as speed.
+    for (const off of [-s * 0.55, s * 0.25]) {
+      ctx.beginPath();
+      ctx.moveTo(off, -s * 0.75);
+      ctx.lineTo(off + s * 0.7, 0);
+      ctx.lineTo(off, s * 0.75);
+      ctx.stroke();
+    }
+    return;
+  }
+
+  if (key === 'w') {
+    // Tail first, so the head sits at the leading edge like the effect does.
+    ctx.beginPath();
+    ctx.moveTo(-s, 0);
+    ctx.lineTo(s * 0.1, 0);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(s * 0.1, -s * 0.6);
+    ctx.lineTo(s, 0);
+    ctx.lineTo(s * 0.1, s * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+
+  // e: arcs opening to the right, growing outward.
+  for (let i = 1; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.arc(-s * 0.55, 0, (s * 0.55 * i) / 1.5, -0.9, 0.9);
+    ctx.stroke();
+  }
 }
 
 /**

@@ -6,12 +6,13 @@
  */
 import { held, pressed, endFrame } from './input.js';
 import {
-  player,
-  updatePlayer,
+  damagePlayer,
   drawPlayer,
+  player,
   resetPlayer,
   revivePlayer,
-  damagePlayer,
+  startDash,
+  updatePlayer,
 } from './player.js';
 import { camera, updateCamera, applyCamera, addShake } from './camera.js';
 import {
@@ -260,7 +261,16 @@ function onAbilityFired(ability) {
   spawnEffect(ability, player.x + player.w / 2, player.y + player.h / 2);
   sfxCast(HIT_COLORS.indexOf(ability.color), ability.archetype);
 
-  // Assault abilities move the player: the dash is the mechanic, not decoration.
+  // The blue archetype IS a dash: it commits the player across the screen and
+  // covers them while they cross. The strike is what they run through on the
+  // way, not a separate thing aimed from a standstill.
+  if (ability.archetype === 'dash') {
+    startDash(ability.aimX, ability.aimY);
+    addShake(7);
+    return;
+  }
+
+  // Assault still lunges, a short hop rather than a crossing.
   if (ability.archetype === 'assault') {
     player.vx = ability.aimX * DASH_IMPULSE;
     // A slight upward component keeps a grounded dash from ploughing into the
@@ -316,13 +326,14 @@ function onBossHit(_boss, viaUltimate) {
   // arena used to be the one place in the game where playing well earned
   // nothing -- the bar you walked in with was the bar you fought with.
   //
-  // Charged at the STRIPPED rate rather than the exact one, because that is
-  // what a boss hit actually is: chip damage off a health pool, not a kill.
-  // At BOSS_MAX_HP hits that earns exactly one ultimate across a full fight.
+  // Charged at the EXACT rate, the same as one-shotting an enemy with its
+  // matching colour: landing a boss hit means reading a colour and answering
+  // it correctly under a timer, which is the same skill and destroys a core
+  // just the same. At BOSS_MAX_HP hits that is two ultimates across a fight.
   //
   // Ultimate hits are excluded for the same reason ultimate kills are: a bar
   // that refills itself is not a resource.
-  if (!viaUltimate) addUltimateCharge(false);
+  if (!viaUltimate) addUltimateCharge(true);
 
   sfxBossHit();
   addShake(9);

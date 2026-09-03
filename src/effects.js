@@ -4,8 +4,8 @@
  * Each mechanic archetype (GDD Section 4) has its own shape, which is both what
  * you see and what actually tests against enemies:
  *
- *   guard    a nova centred on the player      -> circle
- *   assault  a forward dash-strike             -> oriented box
+ *   dash     a fast strike along the dash path -> long oriented box
+ *   assault  a forward strike                  -> oriented box
  *   flow     a wide sweeping arc               -> cone
  *
  * The output colour is carried on the effect and comes from the palette by
@@ -15,6 +15,9 @@
  * player can confirm which colour they fired without relying on hue.
  */
 import { ABILITY_RANGE, EFFECT_LIFETIME, ULTIMATE_RADIUS, ULTIMATE_LIFETIME } from './config.js';
+
+/** Half-height of the dash trail. Matches the player's own silhouette. */
+const DASH_HALF_WIDTH = 18;
 import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { drawGlyph } from './render.js';
 
@@ -107,16 +110,13 @@ export function effectOverlaps(effect, rect) {
     return dist <= ULTIMATE_RADIUS * (effect.age / effect.life) + r;
   }
 
-  if (effect.archetype === 'guard') {
-    return dist <= ABILITY_RANGE.guard + r;
-  }
-
-  if (effect.archetype === 'assault') {
-    // Project onto the aim axis; must be within length ahead and within the
-    // strike's half-width to the side.
+  if (effect.archetype === 'dash' || effect.archetype === 'assault') {
+    // Both project onto the aim axis; the dash simply reaches much further,
+    // because its range is the distance the player actually travels.
+    const reach = ABILITY_RANGE[effect.archetype];
     const along = dx * effect.aimX + dy * effect.aimY;
     const across = Math.abs(dx * -effect.aimY + dy * effect.aimX);
-    return along >= -r && along <= ABILITY_RANGE.assault + r && across <= ASSAULT_HALF_WIDTH + r;
+    return along >= -r && along <= reach + r && across <= ASSAULT_HALF_WIDTH + r;
   }
 
   // flow: inside the radius and within the arc's angle.
@@ -146,8 +146,8 @@ function drawEffect(ctx, effect) {
 
   if (effect.ultimate) {
     drawUltimate(ctx, t);
-  } else if (effect.archetype === 'guard') {
-    drawGuard(ctx, t, color);
+  } else if (effect.archetype === 'dash') {
+    drawDash(ctx, t, color, effect);
     drawEffectGlyph(ctx, effect, t, color);
   } else if (effect.archetype === 'assault') {
     drawAssault(ctx, t, color, effect);
@@ -222,24 +222,44 @@ function drawUltimate(ctx, t) {
 }
 
 /** Guard: a defensive nova expanding from the player. */
-function drawGuard(ctx, t, color) {
-  const r = ABILITY_RANGE.guard * (0.35 + t * 0.75);
+/**
+ * Dash: a trail down the ground the player just crossed.
+ *
+ * Drawn as a streak rather than a nova because that is what the ability now
+ * does -- it covers distance, and the strike is everything the player passed
+ * through. A circle centred on the player would show none of that.
+ */
+function drawDash(ctx, t, color, effect) {
+  ctx.rotate(Math.atan2(effect.aimY, effect.aimX));
 
-  const grad = ctx.createRadialGradient(0, 0, r * 0.35, 0, 0, r);
+  const len = ABILITY_RANGE.dash * Math.min(1, t * 1.6);
+
+  // The trail: brightest at the leading edge, thinning back to the start.
+  const grad = ctx.createLinearGradient(0, 0, len, 0);
   grad.addColorStop(0, 'transparent');
-  grad.addColorStop(0.75, color);
-  grad.addColorStop(1, 'transparent');
+  grad.addColorStop(1, color);
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.moveTo(0, -DASH_HALF_WIDTH * 0.35);
+  ctx.lineTo(len, -DASH_HALF_WIDTH * (1 - t));
+  ctx.lineTo(len, DASH_HALF_WIDTH * (1 - t));
+  ctx.lineTo(0, DASH_HALF_WIDTH * 0.35);
+  ctx.closePath();
   ctx.fill();
 
+  // Afterimages: a few fading copies of the player's silhouette along the
+  // path, which is the cheapest way to read "you were invulnerable here".
+  ctx.globalAlpha = (1 - t) * 0.7;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 3 * (1 - t) + 1;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.lineWidth = 2;
+  for (let i = 1; i <= 4; i++) {
+    const x = (len * i) / 5;
+    const h = DASH_HALF_WIDTH * 1.4 * (1 - t);
+    ctx.strokeRect(x - 5, -h, 10, h * 2);
+  }
+  ctx.globalAlpha = 1;
 }
+
 
 /** Assault: a hard forward streak with a bright leading edge. */
 function drawAssault(ctx, t, color, effect) {

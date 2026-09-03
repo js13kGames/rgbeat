@@ -72,6 +72,15 @@ const LEVELS = [
       // `decor` marks an obstacle that is not part of the route, so the
       // reachability check does not demand the player be able to land on it.
       { x: 3040, y: 545, w: 40, h: 95, decor: 1 },
+
+      // Arena footing. The fight used to happen on a bare floor, which made it
+      // a pure timing exercise: the boss paces, the player waits. Ledges give
+      // the shockwaves something to be dodged ONTO rather than only jumped
+      // over, and give the player a reason to keep moving between windows.
+      // Kept clear of bossSpawn so nothing spawns underneath the boss.
+      { x: 3400, y: 545, w: 170, h: 24 },
+      { x: 3760, y: 470, w: 150, h: 24 },
+      { x: 4080, y: 545, w: 170, h: 24 },
     ],
   },
 
@@ -99,6 +108,11 @@ const LEVELS = [
       { x: 3090, y: 455, w: 160, h: 24 },
 
       { x: 3300, y: 545, w: 40, h: 95, decor: 1 },
+
+      // Arena footing, tighter than level 1's.
+      { x: 3470, y: 545, w: 150, h: 24 },
+      { x: 3820, y: 470, w: 140, h: 24 },
+      { x: 4120, y: 545, w: 150, h: 24 },
     ],
   },
 
@@ -125,6 +139,11 @@ const LEVELS = [
       { x: 2860, y: 455, w: 160, h: 24 },
       { x: 3150, y: 545, w: 180, h: 24 },
       { x: 3420, y: 455, w: 160, h: 24 },
+
+      // Arena footing, tightest of the three.
+      { x: 3740, y: 545, w: 140, h: 24 },
+      { x: 4080, y: 470, w: 130, h: 24 },
+      { x: 4380, y: 545, w: 140, h: 24 },
     ],
   },
 ];

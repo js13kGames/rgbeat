@@ -180,13 +180,13 @@ export function sfxCancel() {
  * so a landed hit still clearly rewards over a whiff.
  *
  * @param {number} colorIndex index into HIT_COLORS
- * @param {string} archetype guard/assault/flow, which shapes the sweep
+ * @param {string} archetype dash/assault/flow, which shapes the sweep
  */
 export function sfxCast(colorIndex, archetype) {
   const f = semitone(HIT_BASE_FREQ, COLOR_SEMITONES[colorIndex] || 0);
   // Each archetype sweeps differently, so the three feel distinct by ear:
-  // guard blooms outward, assault stabs forward, flow sweeps across.
-  if (archetype === 'guard') voice('sine', f, f * 1.6, 0.18, 0.1);
+  // dash rips upward, assault stabs forward, flow sweeps across.
+  if (archetype === 'dash') voice('sine', f, f * 2.4, 0.16, 0.1);
   else if (archetype === 'assault') voice('sawtooth', f * 1.5, f * 0.8, 0.1, 0.1);
   else voice('triangle', f * 0.9, f * 1.8, 0.16, 0.09);
 }

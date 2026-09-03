@@ -10,23 +10,26 @@
  * and the hurt flicker -- because all of it acts on the same body.
  */
 import {
-  GRAVITY,
-  MOVE_SPEED,
   ACCEL,
   AIR_ACCEL,
-  FRICTION,
-  JUMP_VELOCITY,
-  JUMP_CUT_MULTIPLIER,
-  MAX_FALL_SPEED,
   COYOTE_TIME,
-  JUMP_BUFFER,
-  PLAYER_WIDTH,
-  PLAYER_HEIGHT,
-  MAX_HEARTS,
-  IFRAME_TIME,
+  DASH_DURATION,
+  DASH_IFRAME_TAIL,
+  DASH_SPEED,
+  FRICTION,
+  GRAVITY,
   HURT_KNOCKBACK_X,
   HURT_KNOCKBACK_Y,
   HURT_STUN,
+  IFRAME_TIME,
+  JUMP_BUFFER,
+  JUMP_CUT_MULTIPLIER,
+  JUMP_VELOCITY,
+  MAX_FALL_SPEED,
+  MAX_HEARTS,
+  MOVE_SPEED,
+  PLAYER_HEIGHT,
+  PLAYER_WIDTH,
 } from './config.js';
 import { palette, rainbow } from './palette.js';
 import { level, overlapsSolid } from './world.js';
@@ -55,6 +58,10 @@ export const player = {
   invuln: 0,
   /** Seconds the player cannot steer, so a hit reads as a real interruption. */
   stun: 0,
+  /** Seconds of dash left; > 0 means movement and gravity are overridden. */
+  dashTimer: 0,
+  dashX: 1,
+  dashY: 0,
 };
 
 /** Move the player back to the spawn point without touching their health. */
@@ -65,6 +72,7 @@ export function resetPlayer() {
   player.vy = 0;
   player.onGround = false;
   player.stun = 0;
+  player.dashTimer = 0;
 }
 
 /** Full reset: position and health. Used when a life is lost entirely. */
@@ -85,6 +93,25 @@ export function revivePlayer() {
  * @param {number} fromX x position of whatever dealt the damage, for knockback
  *   direction. Omit for hazards with no meaningful direction (e.g. a pit).
  */
+/**
+ * Begin a dash along `aimX, aimY`.
+ *
+ * The invulnerability is granted here rather than by the caller so it cannot
+ * get out of step with the movement: the two are the same mechanic, and a dash
+ * that moved without covering the player would be strictly worse than walking.
+ */
+export function startDash(aimX, aimY) {
+  const len = Math.hypot(aimX, aimY) || 1;
+  player.dashTimer = DASH_DURATION;
+  player.dashX = aimX / len;
+  player.dashY = aimY / len;
+  player.facing = aimX >= 0 ? 1 : -1;
+  // Cover the dash plus its tail in one go. Taking a hit mid-dash cannot
+  // shorten it, because damagePlayer refuses while invuln is up.
+  player.invuln = Math.max(player.invuln, DASH_DURATION + DASH_IFRAME_TAIL);
+  player.stun = 0;
+}
+
 export function damagePlayer(fromX) {
   if (player.invuln > 0) return false;
 
@@ -118,6 +145,25 @@ export function updatePlayer(dt, intent) {
   if (player.stun > 0) {
     player.stun -= dt;
     intent = { move: 0, jumpHeld: false, jumpPressed: false };
+  }
+
+  // --- Dash ---
+  //
+  // A dash overrides steering, gravity and friction entirely: it is a committed
+  // move, and letting the player fight it mid-flight would turn the one
+  // ability with real distance into an awkward glide.
+  if (player.dashTimer > 0) {
+    player.dashTimer -= dt;
+    player.vx = player.dashX * DASH_SPEED;
+    player.vy = player.dashY * DASH_SPEED;
+    moveAxis(player.vx * dt, 0);
+    moveAxis(0, player.vy * dt);
+    // Landing mid-dash still counts as grounded, so the jump is available the
+    // instant it ends.
+    player.airTime = player.onGround ? 0 : player.airTime + dt;
+    player.animTime += dt;
+    player.justJumped = false;
+    return;
   }
 
   // --- Horizontal ---
