@@ -39,7 +39,25 @@ const TOUCH_BUTTON_RADIUS = 34;
  * the ultimate is the one action with no button of its own, and on touch there
  * is no R key to fall back on.
  */
-export const ULT_BAR = { x: 22, y: 52, w: 150, h: 9 };
+/**
+ * Screen position of the ultimate button.
+ *
+ * Exported for the same reason as abilityButtonPos: touch hit-tests against it,
+ * so the drawn button and its tap target cannot drift apart.
+ *
+ * On desktop it sits at the end of the ability row but behind a wider gap than
+ * separates Q/W/E from each other. That gap is the point: the ultimate is
+ * explicitly OUTSIDE the combo grammar (Section 4.3) -- its own key, its own
+ * resource, unaffected by the per-key cooldowns -- and grouping it flush with
+ * the three would say the opposite.
+ */
+export function ultimateButtonPos(viewW, viewH) {
+  const r = buttonRadius();
+  if (isTouch()) {
+    return { x: viewW - r - 26 - r * 2.1, y: viewH - r - 26 - r * 2.9 };
+  }
+  return { x: viewW / 2 + 2 * BUTTON_GAP + 30, y: viewH - BUTTON_BOTTOM_MARGIN };
+}
 
 export function buttonRadius() {
   return isTouch() ? TOUCH_BUTTON_RADIUS : BUTTON_RADIUS;
@@ -78,7 +96,8 @@ export function drawHud(ctx, viewW, viewH, elapsed) {
 
   drawHearts(ctx, 22, 24, elapsed);
   drawLevelBadge(ctx, viewW);
-  drawUltimateBar(ctx, ULT_BAR.x, ULT_BAR.y, elapsed);
+  const up = ultimateButtonPos(viewW, viewH);
+  drawUltimateButton(ctx, up.x, up.y, elapsed);
   if (bossActive()) drawBossBar(ctx, viewW);
   drawToast(ctx, viewW, viewH, elapsed);
 }
@@ -212,41 +231,90 @@ function drawHearts(ctx, x, y, elapsed) {
  * The ultimate bar (Section 11): the one UI element allowed to show full
  * colour, filling with the spectrum as it charges.
  */
-function drawUltimateBar(ctx, x, y, elapsed) {
-  const w = ULT_BAR.w;
-  const h = ULT_BAR.h;
+/**
+ * The ultimate, as a button in the ability row rather than a bar in the corner.
+ *
+ * It was a meter at the top left, diagonally opposite the buttons the player
+ * actually watches, so charge state lived in the one corner nobody looks at
+ * mid-fight. As a ring around a button it is read in the same glance as the
+ * three cooldowns, and the ring encodes progress the same way they do, so
+ * there is one visual grammar for "how ready is this" instead of two.
+ */
+function drawUltimateButton(ctx, x, y, elapsed) {
+  const r = buttonRadius();
+  const charge = Math.max(0, Math.min(1, ultimate.charge));
   const ready = isUltimateReady();
 
-  // Track.
-  ctx.strokeStyle = palette.hudDim;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x, y, w, h);
+  ctx.save();
+  ctx.translate(x, y);
 
-  // Fill: a live rainbow gradient, so the bar visibly *is* the stolen colour
-  // coming back rather than an abstract meter.
-  const fill = Math.max(0, Math.min(1, ultimate.charge)) * w;
-  if (fill > 0) {
-    const grad = ctx.createLinearGradient(x, 0, x + w, 0);
-    for (let i = 0; i <= 6; i++) {
-      grad.addColorStop(i / 6, rainbow(i / 6 + elapsed * 0.08, 58));
+  // Track: the dim ring the charge fills around.
+  ctx.strokeStyle = palette.hudDim;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (ready) {
+    // Full: a live rainbow ring, so the bar visibly IS the stolen colour coming
+    // back rather than an abstract meter -- the one thing worth keeping from
+    // the gradient bar this replaces.
+    ctx.shadowColor = rainbow(elapsed * 0.4, 65);
+    ctx.shadowBlur = 10 + Math.sin(elapsed * 6) * 6;
+    for (let i = 0; i < 6; i++) {
+      ctx.strokeStyle = rainbow(i / 6 + elapsed * 0.08, 58);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, (i / 6) * Math.PI * 2, ((i + 1) / 6) * Math.PI * 2);
+      ctx.stroke();
     }
-    ctx.fillStyle = grad;
-    if (ready) {
-      // Pulse when full, so "available" is noticeable in peripheral vision.
-      ctx.shadowColor = rainbow(elapsed * 0.4, 65);
-      ctx.shadowBlur = 10 + Math.sin(elapsed * 6) * 6;
-    }
-    ctx.fillRect(x, y, fill, h);
     ctx.shadowBlur = 0;
+  } else if (charge > 0) {
+    // Charging: sweeps from the top, exactly like a cooldown, so the two
+    // rings mean the same thing.
+    ctx.strokeStyle = rainbow(elapsed * 0.08, 58);
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * charge);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
-  // Key hint. The ultimate is the one action with no on-screen button of its
-  // own, so without this its binding is undiscoverable.
-  ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
-  ctx.font = 'bold 10px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('R', x + w + 9, y + h / 2);
+  // Star: filled when ready, hollow while charging. Same shape-not-colour rule
+  // as the ability glyphs (Section 10), so readiness never depends on hue.
+  star(ctx, r * 0.5);
+
+  if (ready) {
+    ctx.fillStyle = rainbow(elapsed * 0.25, 70);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = palette.hudDim;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Key cap.
+  if (!isTouch()) {
+    ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('R', 0, r + 16);
+  }
+
+  ctx.restore();
+}
+
+/** Five-pointed star path, centred on the origin. */
+function star(ctx, radius) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    // Alternate outer and inner points. 0.42 is the ratio that reads as a
+    // star rather than as a cog at HUD size.
+    const rad = i % 2 ? radius * 0.42 : radius;
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath();
 }
 
 function drawAbilityButton(ctx, x, y, key) {

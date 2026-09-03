@@ -54,9 +54,40 @@ export const PLAYER_WIDTH = 34;
 export const PLAYER_HEIGHT = 40;
 
 // --- Camera -----------------------------------------------------------------
+/**
+ * How much the world is magnified on screen.
+ *
+ * The game was drawn 1:1 with CSS pixels, which on a wide monitor meant the
+ * player occupied a few percent of the frame and most of the screen was empty
+ * sky above and empty ground below -- the level is 900 units tall and the
+ * action happens in a 200-unit band around y=640.
+ *
+ * Zooming is done by scaling the RENDER, not by shrinking the level: the
+ * camera's view is simply viewW/ZOOM by viewH/ZOOM world units, so everything
+ * downstream -- clamping, culling, the boss wipe, parallax -- keeps working in
+ * world units and only sees a smaller window onto the same level.
+ *
+ * Raising it further starts hiding the ledges the player must jump to, which is
+ * a fairness problem rather than a taste one; `npm run check:level` cannot
+ * catch that, so it wants a playtest.
+ */
+export const ZOOM = 1.7;
+
+
 /** How quickly the camera converges on its target. Higher = tighter. */
 export const CAMERA_STIFFNESS = 6;
-/** Player is kept this far above screen centre, to show more ground ahead. */
+/**
+ * How far BELOW screen centre the player is kept, in world units.
+ *
+ * The old comment here claimed the opposite -- "above centre, to show more
+ * ground ahead" -- which does not match the sign in camera.js. Flipping it to
+ * agree was tried and is worse: below the ground line the level is one flat
+ * unlit slab 260 units deep, so framing more of it trades empty sky for
+ * emptier ground. The sky at least carries the parallax skyline.
+ *
+ * So the player sits below centre deliberately, and this comment is the one
+ * that was wrong.
+ */
 export const CAMERA_Y_OFFSET = 40;
 /** Camera leads the player in their facing direction by this many px. */
 export const CAMERA_LOOKAHEAD = 90;

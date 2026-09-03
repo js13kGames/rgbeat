@@ -218,7 +218,7 @@ export function shockwaveHitting(rect) {
 /**
  * Resolve ability effects against the boss.
  *
- * @param {(boss: object) => void} onHit
+ * @param {(boss: object, viaUltimate: boolean) => void} onHit
  * @param {(boss: object) => void} onDefeat
  * @returns {boolean} whether a wrong-colour hit landed, for feedback
  */
@@ -255,7 +255,7 @@ export function resolveBossHits(onHit, onDefeat) {
     boss.hp--;
     boss.flash = BOSS_HIT_STUN;
     boss.stagger = BOSS_HIT_STUN;
-    onHit(boss);
+    onHit(boss, effect.ultimate);
 
     if (boss.hp <= 0) {
       boss.alive = false;

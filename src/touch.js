@@ -15,7 +15,7 @@
  */
 import { held, pressed } from './input.js';
 import { KEYS } from './combo.js';
-import { abilityButtonPos, buttonRadius, ULT_BAR } from './hud.js';
+import { abilityButtonPos, buttonRadius, ultimateButtonPos } from './hud.js';
 
 /**
  * Whether to present touch controls at all.
@@ -71,14 +71,10 @@ export function initTouch(canvas, getViewSize) {
 
     if (tapHandler && tapHandler(e.clientX, e.clientY, view.w, view.h)) return;
 
-    // The ultimate has no button of its own and there is no R key on touch, so
-    // its bar doubles as the control. Generous padding: it is a thin graphic.
-    if (
-      e.clientX > ULT_BAR.x - 16 &&
-      e.clientX < ULT_BAR.x + ULT_BAR.w + 16 &&
-      e.clientY > ULT_BAR.y - 20 &&
-      e.clientY < ULT_BAR.y + ULT_BAR.h + 20
-    ) {
+    // There is no R key on touch, so the ultimate's own button is the control.
+    // Same generous radius as the ability buttons, for the same reason.
+    const ult = ultimateButtonPos(view.w, view.h);
+    if (Math.hypot(e.clientX - ult.x, e.clientY - ult.y) <= buttonRadius() * 1.25) {
       pressed.ult = true;
       return;
     }

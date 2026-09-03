@@ -80,7 +80,7 @@ import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
 import { updateMenu, drawMenu, tapMenu } from './menu.js';
 import { initTouch, onTap } from './touch.js';
-import { DASH_IMPULSE, BOSS_WIPE_DURATION } from './config.js';
+import { DASH_IMPULSE, BOSS_WIPE_DURATION, ZOOM } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -102,8 +102,9 @@ function resize() {
   canvas.width = viewW * dpr;
   canvas.height = viewH * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // The boss wipe is sized to the screen, so it must follow resizes.
-  setWipeViewport(viewW, viewH);
+  // The boss wipe is sized to the screen, so it must follow resizes -- in world
+  // units, which after zooming is a smaller window than the canvas.
+  setWipeViewport(viewW / ZOOM, viewH / ZOOM);
 }
 
 addEventListener('resize', resize);
@@ -244,7 +245,7 @@ function update(dt) {
 
   // Frame the arena during the fight: the camera stops following the player
   // backwards out of it, so the whole screen is fighting space.
-  updateCamera(dt, player, viewW, viewH, bossActive() ? level.bossArenaX : 0);
+  updateCamera(dt, player, viewW / ZOOM, viewH / ZOOM, bossActive() ? level.bossArenaX : 0);
 
   // Dynamic music (Section 8). Intensity is progress toward the boss arena, so
   // the score tightens as the player approaches and the change in intensity
@@ -309,7 +310,20 @@ function onEnemyStripped(enemy) {
   addShake(2);
 }
 
-function onBossHit() {
+function onBossHit(_boss, viaUltimate) {
+  // Boss hits charge the ultimate too. Section 4.3 says kills charge it and
+  // does not consider a fight with nothing to kill until the very end, so the
+  // arena used to be the one place in the game where playing well earned
+  // nothing -- the bar you walked in with was the bar you fought with.
+  //
+  // Charged at the STRIPPED rate rather than the exact one, because that is
+  // what a boss hit actually is: chip damage off a health pool, not a kill.
+  // At BOSS_MAX_HP hits that earns exactly one ultimate across a full fight.
+  //
+  // Ultimate hits are excluded for the same reason ultimate kills are: a bar
+  // that refills itself is not a resource.
+  if (!viaUltimate) addUltimateCharge(false);
+
   sfxBossHit();
   addShake(9);
 }
@@ -399,9 +413,13 @@ function render() {
   }
 
   ctx.save();
+  // Magnify, then move the camera. Order matters: applyCamera translates in
+  // world units, and it has to be scaled by the same factor as everything it
+  // is positioning.
+  ctx.scale(ZOOM, ZOOM);
   applyCamera(ctx);
 
-  const view = { x: camera.x, y: camera.y, w: viewW, h: viewH };
+  const view = { x: camera.x, y: camera.y, w: viewW / ZOOM, h: viewH / ZOOM };
   drawWorld(ctx, view);
   drawEnemies(ctx, view);
   drawBoss(ctx, view, restorationAmount());
