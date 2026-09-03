@@ -81,7 +81,7 @@ import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
 import { updateMenu, drawMenu, tapMenu } from './menu.js';
 import { initTouch, onTap } from './touch.js';
-import { DASH_IMPULSE, BOSS_WIPE_DURATION, ZOOM } from './config.js';
+import { BOSS_WIPE_DURATION, ZOOM } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -270,12 +270,12 @@ function onAbilityFired(ability) {
     return;
   }
 
-  // Assault still lunges, a short hop rather than a crossing.
+  // The red archetype no longer moves the player. It used to lunge, which was
+  // its whole identity back when nothing else did -- but now that blue is a
+  // dash, two archetypes displacing the player left them competing for the
+  // same role and made the difference between them a matter of degree. Red is
+  // the one you fire from where you stand.
   if (ability.archetype === 'assault') {
-    player.vx = ability.aimX * DASH_IMPULSE;
-    // A slight upward component keeps a grounded dash from ploughing into the
-    // floor, and makes air dashes feel like they carry.
-    if (ability.aimY < 0) player.vy = ability.aimY * DASH_IMPULSE * 0.5;
     player.facing = ability.aimX >= 0 ? 1 : -1;
   }
 

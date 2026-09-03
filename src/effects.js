@@ -268,9 +268,9 @@ function drawAssault(ctx, t, color, effect) {
   const len = ABILITY_RANGE.assault * (0.55 + t * 0.6);
   const halfW = ASSAULT_HALF_WIDTH * (1 - t * 0.55);
 
-  // Speed lines trailing the strike. Assault is the archetype that MOVES the
-  // player, and the old lens shape read as static; these sell the lunge that
-  // the mechanic is actually doing.
+  // Speed lines trailing the strike. The player no longer moves with it, so
+  // these are the only thing carrying the sense of something thrown: without
+  // them a stationary strike at this range reads as a wall, not a lunge.
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
   ctx.globalAlpha = (1 - t) * 0.55;

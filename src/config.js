@@ -139,10 +139,12 @@ export const COOLDOWN = { q: 0.35, w: 0.35, e: 0.35 };
 /**
  * Reach of each mechanic archetype, in px.
  *
- * Assault must stay longer than the distance the dash itself carries the
- * player (DASH_IMPULSE * EFFECT_LIFETIME, roughly 150px). At 130 the strike
- * ended behind the player's own landing spot, so enemies they dashed *into*
- * fell outside the hitbox and the ability felt far shorter than it looked.
+ * Assault's 210 was originally sized to outrun the lunge it used to apply to
+ * the player. That lunge is gone -- blue is the dash now -- but the number
+ * stays: fired from a standstill, 210px is what makes it read as a strike
+ * thrown ACROSS a gap rather than a swing at arm's length, which is the role
+ * it has to fill now that it is the only ability that neither moves you nor
+ * sweeps around you.
  */
 export const ABILITY_RANGE = {
   // The dash's hitbox runs the whole length of the dash, so anything the player
@@ -156,9 +158,6 @@ export const ABILITY_RANGE = {
 /** How long an ability's visual effect lives, in seconds. */
 export const EFFECT_LIFETIME = 0.32;
 
-/** Forward impulse applied to the player by Assault abilities. */
-export const DASH_IMPULSE = 460;
-
 // --- Dash (the blue archetype) ----------------------------------------------
 /**
  * The dash is the one ability that is a MOVEMENT option first and a strike
@@ -170,8 +169,16 @@ export const DASH_IMPULSE = 460;
  * the thing the player is actually trying to do -- but far too short to dash
  * early and still be covered when the attack arrives.
  */
+/**
+ * Distance is tuned by SPEED, not by duration: 0.5s is what the dash feels
+ * like, and shortening it to travel less would have made it snappier as well
+ * as shorter, which is a different change. At 900px/s it crossed 465px --
+ * nearly a third of the visible arena in one press, far enough that the player
+ * routinely arrived somewhere they had not chosen. 630 covers about 70% of
+ * that, which still outruns anything else in the game.
+ */
 export const DASH_DURATION = 0.5;
-export const DASH_SPEED = 900; // px/s -- 3.2x a normal run
+export const DASH_SPEED = 630; // px/s -- 2.25x a normal run
 export const DASH_IFRAME_TAIL = 0.2; // s of cover after the dash ends
 
 // The dash's reach IS the ground it covers.
