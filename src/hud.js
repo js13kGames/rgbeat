@@ -496,6 +496,7 @@ export function drawComboIndicator(ctx, player) {
  */
 let toastText = '';
 let toastUntil = 0;
+let toastFrom = 0;
 let toastBanner = false;
 
 /**
@@ -505,24 +506,33 @@ let toastBanner = false;
  */
 export function showToast(text, elapsed, seconds = 2.6, banner = false) {
   toastText = text;
+  toastFrom = elapsed;
   toastUntil = elapsed + seconds;
   toastBanner = banner;
 }
 
+/** Seconds a message spends fading in, and again fading out. */
+const TOAST_FADE = 0.35;
+
 function drawToast(ctx, viewW, viewH, elapsed) {
   if (elapsed > toastUntil) return;
 
-  // Fade out over the last half second rather than vanishing.
-  const remaining = toastUntil - elapsed;
+  // Fade in and out rather than appearing and vanishing. Symmetrical on
+  // purpose: a line that snaps into existence reads as an error message, and
+  // the tutorial's whole job is to feel like part of the game speaking.
   ctx.save();
-  ctx.globalAlpha = Math.min(1, remaining * 2);
+  ctx.globalAlpha = Math.min(
+    1,
+    (elapsed - toastFrom) / TOAST_FADE,
+    (toastUntil - elapsed) / TOAST_FADE
+  );
   ctx.fillStyle = palette.hudText;
   ctx.textAlign = 'center';
 
   if (toastBanner) {
     // High and centred, clear of the boss pip bar at y=26 so the two can never
     // overlap -- the tutorial's last line fires just short of the arena.
-    ctx.font = 'bold 17px monospace';
+    ctx.font = 'bold 21px monospace';
     ctx.textBaseline = 'top';
     ctx.fillText(toastText, viewW / 2, 72);
   } else {

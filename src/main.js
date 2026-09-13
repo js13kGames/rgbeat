@@ -144,6 +144,9 @@ const TUTORIAL = [
   [1430, 'The thief holds every colour. Hit only the lit one.'],
 ];
 
+/** Seconds each tutorial line stays up, fades included. */
+const TUTORIAL_LINE_TIME = 2;
+
 /** How far through TUTORIAL we are. Reset with the level. */
 let scriptLine = 0;
 
@@ -335,9 +338,11 @@ function updateCoaching(dt, fired) {
   if (levelIndex === 0 && scriptLine < TUTORIAL.length) {
     const [at, text] = TUTORIAL[scriptLine];
     if (player.x >= at) {
-      showToast(text, elapsed, 3.4, true);
+      showToast(text, elapsed, TUTORIAL_LINE_TIME, true);
       scriptLine++;
-      idleTime = -3.4;
+      // Hold the idle hint off until the line has been read, so the two never
+      // talk over each other in the one level where both are likely.
+      idleTime = -TUTORIAL_LINE_TIME;
     }
   }
 
