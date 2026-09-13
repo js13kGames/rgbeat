@@ -5,7 +5,7 @@
 **Target size:** ≤ 13,312 bytes (13 KiB) zipped, zero external resources
 **Target platforms:** Desktop (keyboard) and Mobile (touch), Chrome + Firefox, no console errors
 
-This document is a complete functional and creative specification. It is written to be handed to a generative AI (or a human developer) as the single source of truth for implementing the game. Where a design decision was ambiguous in the original pitch, this document resolves it explicitly and flags the resolution so it can be revisited.
+This document is a complete functional and creative specification. It is written to be handed to an implementer as the single source of truth for building the game. Where a design decision was ambiguous in the original pitch, this document resolves it explicitly and flags the resolution so it can be revisited.
 
 **Revision note:** this version adds two systems (per-key ability cooldowns, and a player health/failure state) confirmed after reviewing reference HUD concept art. A combo-streak scoring multiplier and an in-HUD "suggested sequence" hint were also present in that concept art but were explicitly **not** adopted for this revision — do not implement them.
 
@@ -244,7 +244,7 @@ Given the 13 KiB hard limit and jam timeline, if cuts are needed, cut in this or
 
 ---
 
-## 15. Open Questions for the Implementing AI
+## 15. Open Questions for Implementation
 
 These are intentionally left flexible — make a reasonable choice, note the choice in code comments, and move on rather than blocking on them:
 
