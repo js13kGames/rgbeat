@@ -199,7 +199,7 @@ function drawLogo(ctx, viewW, viewH, elapsed) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.globalAlpha = 0.75;
-  ctx.fillText('DEVUELVE LOS COLORES.', viewW / 2, y + h + 14);
+  ctx.fillText('GIVE THE COLOUR BACK.', viewW / 2, y + h + 14);
   ctx.globalAlpha = 1;
 }
 
