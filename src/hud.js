@@ -494,58 +494,65 @@ export function drawComboIndicator(ctx, player) {
  * with no menu in the byte budget, the cycle key plus a confirmation of what it
  * landed on is the honest minimum.
  */
-let toastText = '';
-let toastUntil = 0;
-let toastFrom = 0;
-let toastBanner = false;
-
 /**
- * @param {boolean} banner Show it large and high on the screen instead of as a
- *   small line above the buttons. Used for the tutorial, which is the one thing
- *   the player is meant to STOP and read rather than catch in passing.
+ * Two message slots, not one.
+ *
+ * The banner and the UI line say different kinds of thing and are read at
+ * different moments, so sharing a slot meant whichever spoke last silenced the
+ * other. At the arena door that was fatal: the leader's introduction and the
+ * instruction on how to hurt it sit 130px apart, which is half a second at a
+ * run, so the story was erased before it could be read. They now coexist --
+ * the lore above, the instruction down with the controls.
  */
-export function showToast(text, elapsed, seconds = 2.6, banner = false) {
-  toastText = text;
-  toastFrom = elapsed;
-  toastUntil = elapsed + seconds;
-  toastBanner = banner;
-}
+const slots = {
+  banner: { text: '', from: 0, until: 0 },
+  hint: { text: '', from: 0, until: 0 },
+};
 
 /** Seconds a message spends fading in, and again fading out. */
 const TOAST_FADE = 0.35;
 
-function drawToast(ctx, viewW, viewH, elapsed) {
-  if (elapsed > toastUntil) return;
+/**
+ * @param {boolean} banner Large and centred (lore) rather than a line above the
+ *   buttons (anything the player acts on).
+ */
+export function showToast(text, elapsed, seconds = 2.6, banner = false) {
+  const slot = banner ? slots.banner : slots.hint;
+  slot.text = text;
+  slot.from = elapsed;
+  slot.until = elapsed + seconds;
+}
 
-  // Fade in and out rather than appearing and vanishing. Symmetrical on
-  // purpose: a line that snaps into existence reads as an error message, and
-  // the tutorial's whole job is to feel like part of the game speaking.
+function drawSlot(ctx, slot, x, y, font, baseline, elapsed) {
+  if (elapsed > slot.until) return;
+
   ctx.save();
+  // Fade in and out rather than appearing and vanishing. Symmetrical on
+  // purpose: a line that snaps into existence reads as an error message.
   ctx.globalAlpha = Math.min(
     1,
-    (elapsed - toastFrom) / TOAST_FADE,
-    (toastUntil - elapsed) / TOAST_FADE
+    (elapsed - slot.from) / TOAST_FADE,
+    (slot.until - elapsed) / TOAST_FADE
   );
   ctx.fillStyle = palette.hudText;
+  ctx.font = font;
   ctx.textAlign = 'center';
-
-  if (toastBanner) {
-    // High and centred, clear of the boss pip bar at y=26 so the two can never
-    // overlap -- the tutorial's last line fires just short of the arena.
-    ctx.font = 'bold 21px monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText(toastText, viewW / 2, 72);
-  } else {
-    ctx.font = '15px monospace';
-    ctx.textBaseline = 'bottom';
-    // Derived from the buttons rather than a fixed offset: this line sits
-    // directly above them, so a change to their size or margin used to push
-    // them straight through it. Enlarging the row is exactly what did.
-    const above = isTouch() ? 210 : BUTTON_BOTTOM_MARGIN + buttonRadius() + 24;
-    ctx.fillText(toastText, viewW / 2, viewH - above);
-  }
-
+  ctx.textBaseline = baseline;
+  ctx.fillText(slot.text, x, y);
   ctx.restore();
+}
+
+function drawToast(ctx, viewW, viewH, elapsed) {
+  // Lore: high and centred, but BELOW the boss readout, which runs from the pip
+  // bar at y=26 down to the bottom of the colour markers around y=70. The
+  // leader's introduction fires exactly when that readout appears, so the two
+  // have to be legible at the same time rather than on top of each other.
+  drawSlot(ctx, slots.banner, viewW / 2, 92, 'bold 21px monospace', 'top', elapsed);
+
+  // Instructions: directly above the buttons they describe. Derived from the
+  // button geometry, so resizing the row cannot push it through this line.
+  const above = isTouch() ? 210 : BUTTON_BOTTOM_MARGIN + buttonRadius() + 24;
+  drawSlot(ctx, slots.hint, viewW / 2, viewH - above, '15px monospace', 'bottom', elapsed);
 }
 
 /**

@@ -161,7 +161,7 @@ const TUTORIAL = [
   [640, 'A combo is TWO keys: the first picks the attack...'],
   [840, '...the second picks blue, red or green.'],
   [1120, 'Orange is red and green mixed. Try W then E.'],
-  [1330, 'Their leader holds every colour at once.', 1],
+  [1280, 'Their leader holds every colour at once.', 1],
   [1460, 'Only the lit colour can hurt it.'],
 ];
 
@@ -169,7 +169,7 @@ const TUTORIAL = [
 const TUTORIAL_LINE_TIME = 2;
 
 /** Lore is held longer: it is prose, and it is read rather than glanced at. */
-const LORE_LINE_TIME = 3.6;
+const LORE_LINE_TIME = 4.4;
 
 /** How far through TUTORIAL we are. Reset with the level. */
 let scriptLine = 0;

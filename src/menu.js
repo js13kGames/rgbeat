@@ -232,6 +232,13 @@ function drawRows(ctx, viewW, viewH, elapsed) {
     ctx.fillStyle = palette[names[i]];
     ctx.fillRect(cx - 96 + i * 32, swatchY, 22, 8);
   }
+
+  // What the arrows actually DO. The animation on them says "press left or
+  // right"; this says what happens when you do, which is the half a player
+  // cannot guess from a moving triangle.
+  ctx.fillStyle = palette.hudDim;
+  ctx.font = '11px monospace';
+  ctx.fillText('left / right change the colour mode', cx, swatchY + 26);
 }
 
 function drawRow(ctx, cx, y, label, active, elapsed) {
@@ -242,12 +249,17 @@ function drawRow(ctx, cx, y, label, active, elapsed) {
     ctx.fillStyle = rainbow(elapsed * 0.25, 66);
     ctx.fillText(label, cx, y);
     const w = ctx.measureText(label).width;
-    // Pointing OUTWARD, away from the label. Turned inward they read as a
-    // bracket -- decoration around the current row -- which says nothing about
-    // what the arrow keys do. Outward they read as an invitation to press left
-    // or right, which is exactly the control the menu needs the player to find.
-    ctx.fillText('◂', cx - w / 2 - 22, y);
-    ctx.fillText('▸', cx + w / 2 + 22, y);
+
+    // Pointing OUTWARD, and MOVING outward and back.
+    //
+    // Static arrows read as a bracket -- decoration marking the current row --
+    // which says nothing about what the keys do. Pointing them out helped;
+    // animating them is what actually reads as an instruction, because a thing
+    // that repeatedly travels left and right is describing a left/right
+    // control rather than merely pointing at one.
+    const nudge = 3 + Math.sin(elapsed * 4) * 3;
+    ctx.fillText('◂', cx - w / 2 - 20 - nudge, y);
+    ctx.fillText('▸', cx + w / 2 + 20 + nudge, y);
   } else {
     ctx.fillStyle = palette.hudDim;
     ctx.fillText(label, cx, y);
