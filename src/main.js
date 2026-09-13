@@ -81,7 +81,7 @@ import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
 import { updateMenu, drawMenu, tapMenu } from './menu.js';
 import { initTouch, onTap } from './touch.js';
-import { BOSS_WIPE_DURATION, IDLE_HINT_DELAY, ZOOM } from './config.js';
+import { BOSS_WIPE_DURATION, IDLE_HINT_DELAY, MAX_HEARTS, ZOOM } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -178,6 +178,29 @@ let scriptLine = 0;
 let introLine = 0;
 let introTimer = 0;
 
+/**
+ * The closing lore. Played in the world, not on the title screen.
+ *
+ * The game used to cut straight to the menu and set a farewell toast that was
+ * never drawn -- render() returns before the HUD when inMenu is true, so the
+ * one line meant to reward finishing the game could not appear at all. Worse,
+ * cutting away threw out the only moment the premise is fully delivered: after
+ * the last wipe the world is at full colour, which is the thing the title
+ * screen has been promising since the first screen. So the ending stays there,
+ * in the restored city, and lets the player stand in it.
+ */
+const OUTRO = [
+  'The last colour is back where it belongs.',
+  'The city is loud again, and it is yours.',
+];
+
+/** -1 when not running; otherwise the line being shown. */
+let outroLine = -1;
+let outroTimer = 0;
+
+/** Enemies killed across the whole run, for the closing summary. */
+let runKills = 0;
+
 /** Seconds the player has given no input at all. */
 let idleTime = 0;
 
@@ -210,6 +233,8 @@ onTap((x, y, w, h) => {
 
 function beginGame() {
   inMenu = false;
+  runKills = 0;
+  outroLine = -1;
   loadLevel(0);
   startLevel();
   // The title screen already offered the palette, so this only has to cover
@@ -363,6 +388,23 @@ function updateCoaching(dt, fired) {
     idleTime = -3;
   }
 
+  // The ending, on its own clock, and ahead of everything else: once it starts
+  // nothing the player does should interrupt it.
+  if (outroLine >= 0) {
+    outroTimer -= dt;
+    if (outroTimer <= 0) {
+      if (outroLine < OUTRO.length) {
+        showToast(OUTRO[outroLine], elapsed, LORE_LINE_TIME, true);
+        outroTimer = LORE_LINE_TIME;
+        outroLine++;
+      } else {
+        inMenu = true;
+        outroLine = -1;
+      }
+    }
+    return;
+  }
+
   // The opening lore, on its own clock.
   if (levelIndex === 0 && introLine < INTRO.length) {
     introTimer -= dt;
@@ -437,6 +479,7 @@ function onAbilityFired(ability) {
  */
 function onEnemyKilled(enemy, exact, viaUltimate) {
   levelKills++;
+  runKills++;
 
   if (__DEV__) {
     killLog.push({
@@ -508,10 +551,21 @@ function advanceLevel() {
   const next = levelIndex + 1;
 
   if (next >= LEVEL_COUNT) {
-    // Every level restored. Back to the title screen, which is where the
-    // wordmark and the full-colour palette live -- a fitting place to land.
-    inMenu = true;
-    showToast('all colour restored  --  thank you for playing', elapsed, 7);
+    // Every level restored. Stay in the world and play the ending there; the
+    // title screen comes after, once there is nothing left to say.
+    outroLine = 0;
+    outroTimer = 0;
+
+    // The run, in one line: what it cost, and how it was played. Held for the
+    // whole ending rather than flashed, since it is the last thing on screen.
+    const spent = MAX_HEARTS - player.hearts;
+    showToast(
+      (runKills ? runKills + ' colours recovered' : 'a pacifist run') +
+        '  --  ' +
+        (spent ? spent + ' hearts spent' : 'not a single heart lost'),
+      elapsed,
+      LORE_LINE_TIME * (OUTRO.length + 1)
+    );
     return;
   }
 

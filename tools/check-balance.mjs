@@ -15,9 +15,12 @@
  *
  * Run via `npm run check:balance`. Dev-only: zero shipped bytes.
  */
+import { LEVEL_COUNT } from '../src/world.js';
 import {
   COOLDOWN,
   BOSS_WEAK_WINDOW,
+  BOSS_WINDOW_PER_LEVEL,
+  BOSS_WINDOW_RUSH,
   BOSS_HIT_STUN,
   AIM_WINDOW,
   VOLATILE_SHIFT_TIME,
@@ -54,8 +57,23 @@ for (const ability of Object.values(ABILITIES)) {
 
 console.log('\nInputs (from src/config.js and the real combo table)');
 console.log('  per-key cooldown : ' + COOLDOWN.q + 's / ' + COOLDOWN.w + 's / ' + COOLDOWN.e + 's');
-console.log('  weak window      : ' + BOSS_WEAK_WINDOW + 's');
-console.log('  telegraph        : the whole window, ' + BOSS_WEAK_WINDOW + 's');
+/**
+ * The TIGHTEST window any boss can ever show: last level, last hit point.
+ *
+ * Checking the nominal BOSS_WEAK_WINDOW would prove nothing now that it ramps.
+ * Every timing assertion below runs against this figure instead, because a
+ * window the player cannot answer is a wall no matter how rare it is -- and the
+ * rare one here is the final hit of the final boss, the worst possible place
+ * for the fight to become unfair.
+ */
+// Derived, not typed: a level added later must tighten this automatically, or
+// the checker would keep proving a worst case that is no longer the worst.
+const LAST_LEVEL = LEVEL_COUNT - 1;
+const MIN_WINDOW =
+  BOSS_WEAK_WINDOW * (1 - LAST_LEVEL * BOSS_WINDOW_PER_LEVEL) * (1 - BOSS_WINDOW_RUSH);
+
+console.log('  weak window      : ' + BOSS_WEAK_WINDOW + 's, tightening to ' + MIN_WINDOW.toFixed(2) + 's');
+console.log('  telegraph        : the whole window');
 console.log('  aim window       : ' + AIM_WINDOW + 's');
 
 console.log('\nKeys required per hit-colour');
@@ -74,7 +92,7 @@ for (const color of HIT_COLORS) {
   const keys = keysFor[color];
   const wait = Math.max(...keys.map((k) => COOLDOWN[k]));
   const total = wait + EXECUTION_TIME;
-  const slack = BOSS_WEAK_WINDOW - BOSS_HIT_STUN - total;
+  const slack = MIN_WINDOW - BOSS_HIT_STUN - total;
 
   const label =
     color.padEnd(7) +
@@ -111,9 +129,9 @@ function simulateFight(sequence) {
   for (const color of sequence) {
     const keys = keysFor[color];
     // A landed hit staggers the boss, so the window that follows one is
-    // shorter than the full BOSS_WEAK_WINDOW by that much.
+    // shorter than the full window by that much.
     const windowStart = time + (results.length ? BOSS_HIT_STUN : 0);
-    const windowEnd = time + BOSS_WEAK_WINDOW;
+    const windowEnd = time + MIN_WINDOW;
 
     // Earliest moment every required key is ready.
     let ready = windowStart;
@@ -160,7 +178,7 @@ for (const r of simulateFight(stressSequence)) {
     's, hit at ' +
     r.hitAt.toFixed(2) +
     's of ' +
-    BOSS_WEAK_WINDOW +
+    MIN_WINDOW.toFixed(2) +
     's';
   if (!r.landed) fail(label + '  MISSED');
   else console.log('  ok    ' + label);
@@ -190,9 +208,9 @@ console.log(
     ' hit at ' +
     worst.hitAt.toFixed(2) +
     's of ' +
-    BOSS_WEAK_WINDOW +
+    MIN_WINDOW.toFixed(2) +
     's (' +
-    (BOSS_WEAK_WINDOW - worst.hitAt).toFixed(2) +
+    (MIN_WINDOW - worst.hitAt).toFixed(2) +
     's to spare)'
 );
 
@@ -222,14 +240,14 @@ for (const color of HIT_COLORS) {
 // that is the figure that has to clear the reaction bar.
 console.log('');
 console.log('Telegraph');
-if (BOSS_WEAK_WINDOW < AIM_WINDOW) {
+if (MIN_WINDOW < AIM_WINDOW) {
   fail(
-    'the window (' + BOSS_WEAK_WINDOW + 's) is shorter than the aim window; ' +
+    'the tightest window (' + MIN_WINDOW.toFixed(2) + 's) is shorter than the aim window; ' +
       'the player cannot finish a combo inside the warning'
   );
 } else {
   console.log(
-    '  ok    ' + BOSS_WEAK_WINDOW + 's of warning, longer than the ' + AIM_WINDOW + 's aim window'
+    '  ok    ' + MIN_WINDOW.toFixed(2) + 's of warning, longer than the ' + AIM_WINDOW + 's aim window'
   );
 }
 

@@ -282,12 +282,29 @@ export const BOSS_MAX_HP = 10;
  * just went on cooldown, so this must comfortably exceed COOLDOWN plus the
  * time to execute a two-key combo. `npm run check:balance` proves it.
  *
- * It shrank from 3.6s to 1.6s when the cooldown dropped to 0.35s. That is not
- * an unrelated tweak: the window was sized around the old 1.8s cooldown, and
- * left at 3.6s it would have handed the player two and a half free seconds per
- * colour, turning a reaction check into a formality.
+ * It shrank from 3.6s to 2s when the cooldown dropped to 0.35s, then went back
+ * up to 2.5s when the window started RAMPING. That is not a reversal: 2.5s is
+ * now the most generous window in the game rather than the only one, and it has
+ * to leave room above the floor for the ramps below to eat into. The floor is
+ * what `npm run check:balance` actually defends.
  */
-export const BOSS_WEAK_WINDOW = 2;
+export const BOSS_WEAK_WINDOW = 2.5;
+
+/**
+ * How the weak window tightens, as fractions shaved off BOSS_WEAK_WINDOW.
+ *
+ * Section 4.2 makes the window a HARD constraint, not a feel preference: the
+ * player must land a valid hit inside EVERY window, worst case being a
+ * secondary colour whose two keys both just went on cooldown. So these are
+ * bounded, and `npm run check:balance` proves the tightest window any boss can
+ * ever show -- last level, last hit point -- still clears that worst case.
+ *
+ * RUSH is the one that carries the fight: a boss that reads the same at one hit
+ * point as at fourteen has no climax. PER_LEVEL is deliberately smaller,
+ * because it stacks on top of RUSH and the product is what has to stay legal.
+ */
+export const BOSS_WINDOW_PER_LEVEL = 0.04;
+export const BOSS_WINDOW_RUSH = 0.15;
 
 /**
  * Seconds the boss is staggered after a hit: it flashes AND cannot be hit
@@ -322,6 +339,9 @@ export const VOLATILE_SHIFT_TIME = 1.8;
  * loop that the fight is actually about.
  */
 export const BOSS_ATTACK_INTERVAL = 3.2;
+
+/** Seconds shaved off the slam interval per level. Pressure, not reading time. */
+export const BOSS_ATTACK_RAMP = 0.25;
 
 /** Wind-up before the slam. This IS the telegraph, so it cannot be short. */
 export const BOSS_ATTACK_WINDUP = 0.7;

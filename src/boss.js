@@ -27,6 +27,9 @@ import {
   BOSS_SPEED,
   BOSS_MAX_HP,
   BOSS_WEAK_WINDOW,
+  BOSS_WINDOW_PER_LEVEL,
+  BOSS_WINDOW_RUSH,
+  BOSS_ATTACK_RAMP,
   BOSS_HIT_STUN,
   BOSS_ATTACK_INTERVAL,
   BOSS_ATTACK_WINDUP,
@@ -37,7 +40,7 @@ import {
   SHOCKWAVE_RADIUS,
 } from './config.js';
 import { palette, rainbow, HIT_COLORS } from './palette.js';
-import { level } from './world.js';
+import { level, levelIndex } from './world.js';
 import { effects, effectOverlaps } from './effects.js';
 import { mixColor, drawGlyph } from './render.js';
 
@@ -105,14 +108,16 @@ export function spawnBoss() {
   // Per-level, falling back to the default. The tutorial's boss is a
   // demonstration rather than a test: it has to be survivable by someone who
   // has known the combo grammar for ninety seconds.
-  boss.hp = level.bossHp || BOSS_MAX_HP;
+  // Later bosses take more reads, which is the plainest progression there is:
+  // the pip bar visibly gets longer. The tutorial overrides it outright.
+  boss.hp = level.bossHp || BOSS_MAX_HP + (levelIndex - 1) * 2;
   boss.maxHp = boss.hp;
   boss.weak = drawFromBag();
   boss.next = drawFromBag();
-  boss.timer = BOSS_WEAK_WINDOW;
+  boss.timer = weakWindow();
   boss.flash = 0;
   boss.stagger = 0;
-  boss.attackTimer = BOSS_ATTACK_INTERVAL;
+  boss.attackTimer = attackInterval();
   boss.windup = 0;
   shockwaves.length = 0;
   boss.dir = -1;
@@ -125,9 +130,22 @@ export function bossActive() {
   return boss.alive && boss.engaged;
 }
 
+/**
+ * The current weak window, in seconds.
+ *
+ * Two ramps multiply: one across the run, one across this fight. The second is
+ * what the player actually feels -- the same boss giving less time the closer
+ * it is to dying -- and it is why the last hit is the hard one.
+ */
+export function weakWindow() {
+  const byLevel = 1 - levelIndex * BOSS_WINDOW_PER_LEVEL;
+  const byDamage = 1 - (1 - boss.hp / boss.maxHp) * BOSS_WINDOW_RUSH;
+  return BOSS_WEAK_WINDOW * byLevel * byDamage;
+}
+
 /** How far through the current window we are, 0..1. */
 export function windowProgress() {
-  return 1 - boss.timer / BOSS_WEAK_WINDOW;
+  return 1 - boss.timer / weakWindow();
 }
 
 export function updateBoss(dt, playerX) {
@@ -155,7 +173,7 @@ export function updateBoss(dt, playerX) {
   if (boss.timer <= 0) {
     boss.weak = boss.next;
     boss.next = drawFromBag();
-    boss.timer = BOSS_WEAK_WINDOW;
+    boss.timer = weakWindow();
   }
 
   updateAttack(dt);
@@ -168,6 +186,11 @@ export function updateBoss(dt, playerX) {
  * telegraphed, and an untelegraphed area attack in a fight that already demands
  * the player watch a colour would just feel arbitrary.
  */
+/** Slam interval for this level: later bosses attack more often. */
+function attackInterval() {
+  return BOSS_ATTACK_INTERVAL - levelIndex * BOSS_ATTACK_RAMP;
+}
+
 function updateAttack(dt) {
   if (boss.windup > 0) {
     boss.windup -= dt;
@@ -176,7 +199,7 @@ function updateAttack(dt) {
     boss.attackTimer -= dt;
     if (boss.attackTimer <= 0) {
       boss.windup = BOSS_ATTACK_WINDUP;
-      boss.attackTimer = BOSS_ATTACK_INTERVAL;
+      boss.attackTimer = attackInterval();
     }
   }
 
@@ -331,7 +354,9 @@ export function resolveBossHits(onHit, onDefeat) {
     // colour and burst the boss down with a single ability.
     boss.weak = boss.next;
     boss.next = drawFromBag();
-    boss.timer = BOSS_WEAK_WINDOW;
+    // Recomputed, not reset: hp just dropped, so the window this hit earned is
+    // already tighter than the one before it.
+    boss.timer = weakWindow();
   }
 
   return wrong;
