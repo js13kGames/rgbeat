@@ -183,11 +183,16 @@ export const EFFECT_LIFETIME = 0.32;
  * like, and shortening it to travel less would have made it snappier as well
  * as shorter, which is a different change. At 900px/s it crossed 465px --
  * nearly a third of the visible arena in one press, far enough that the player
- * routinely arrived somewhere they had not chosen. 560 covers about 60% of
- * that -- still double a run, and still the fastest thing in the game.
+ * routinely arrived somewhere they had not chosen. 430 brings it to 222px,
+ * under half the original.
+ *
+ * This is close to the floor for tuning by speed alone. The duration is fixed
+ * at 0.5s, so anything much slower stops outrunning a plain run and the dash
+ * stops reading as one. Shortening the CLOCK instead is the next lever: it
+ * takes distance out without touching how fast the crossing feels.
  */
 export const DASH_DURATION = 0.5;
-export const DASH_SPEED = 560; // px/s -- 2x a normal run
+export const DASH_SPEED = 430; // px/s -- 1.5x a normal run
 export const DASH_IFRAME_TAIL = 0.2; // s of cover after the dash ends
 
 // The dash's reach IS the ground it covers.

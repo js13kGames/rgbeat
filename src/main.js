@@ -335,7 +335,7 @@ function updateCoaching(dt, fired) {
   if (levelIndex === 0 && scriptLine < TUTORIAL.length) {
     const [at, text] = TUTORIAL[scriptLine];
     if (player.x >= at) {
-      showToast(text, elapsed, 3.4);
+      showToast(text, elapsed, 3.4, true);
       scriptLine++;
       idleTime = -3.4;
     }

@@ -496,10 +496,17 @@ export function drawComboIndicator(ctx, player) {
  */
 let toastText = '';
 let toastUntil = 0;
+let toastBanner = false;
 
-export function showToast(text, elapsed, seconds = 2.6) {
+/**
+ * @param {boolean} banner Show it large and high on the screen instead of as a
+ *   small line above the buttons. Used for the tutorial, which is the one thing
+ *   the player is meant to STOP and read rather than catch in passing.
+ */
+export function showToast(text, elapsed, seconds = 2.6, banner = false) {
   toastText = text;
   toastUntil = elapsed + seconds;
+  toastBanner = banner;
 }
 
 function drawToast(ctx, viewW, viewH, elapsed) {
@@ -510,10 +517,20 @@ function drawToast(ctx, viewW, viewH, elapsed) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, remaining * 2);
   ctx.fillStyle = palette.hudText;
-  ctx.font = '12px monospace';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(toastText, viewW / 2, viewH - (isTouch() ? 210 : 96));
+
+  if (toastBanner) {
+    // High and centred, clear of the boss pip bar at y=26 so the two can never
+    // overlap -- the tutorial's last line fires just short of the arena.
+    ctx.font = 'bold 17px monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillText(toastText, viewW / 2, 72);
+  } else {
+    ctx.font = '12px monospace';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(toastText, viewW / 2, viewH - (isTouch() ? 210 : 96));
+  }
+
   ctx.restore();
 }
 
