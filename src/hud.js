@@ -27,12 +27,12 @@ import { isTouch } from './touch.js';
 /** Which colour each key shows on its HUD button (its base colour, Section 4). */
 const KEY_COLOR = { q: 'blue', w: 'red', e: 'green' };
 
-const BUTTON_RADIUS = 26;
-const BUTTON_GAP = 78;
-const BUTTON_BOTTOM_MARGIN = 58;
+const BUTTON_RADIUS = 31;
+const BUTTON_GAP = 90;
+const BUTTON_BOTTOM_MARGIN = 74;
 
 /** Touch buttons are bigger: a 26px radius is below a comfortable tap target. */
-const TOUCH_BUTTON_RADIUS = 34;
+const TOUCH_BUTTON_RADIUS = 38;
 
 /**
  * The ultimate bar's rectangle. Exported so touch can use it as a tap target:
@@ -94,7 +94,7 @@ export function drawHud(ctx, viewW, viewH, elapsed) {
 
   if (isTouch()) drawMoveZone(ctx, viewH);
 
-  drawHearts(ctx, 26, 30);
+  drawHearts(ctx, 38, 42);
   drawLevelBadge(ctx, viewW);
   const up = ultimateButtonPos(viewW, viewH);
   drawUltimateButton(ctx, up.x, up.y, elapsed);
@@ -183,10 +183,10 @@ function drawMarker(ctx, x, y, size, colorName, alpha, glow) {
 /** Which level this is, so progress through the game is legible at a glance. */
 function drawLevelBadge(ctx, viewW) {
   ctx.fillStyle = palette.hudDim;
-  ctx.font = '11px monospace';
+  ctx.font = '13px monospace';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.fillText(levelIndex + 1 + ' / ' + LEVEL_COUNT, viewW - 22, 18);
+  ctx.fillText(levelIndex + 1 + ' / ' + LEVEL_COUNT, viewW - 34, 28);
 }
 
 /**
@@ -202,8 +202,8 @@ function drawHearts(ctx, x, y) {
   // for a colour REQUIREMENT: every other coloured thing on screen names a
   // combo the player has to answer with, and hearts that cycled through the
   // same six hues were speaking the game's own vocabulary without meaning it.
-  const size = 13;
-  const gap = 32;
+  const size = 16;
+  const gap = 39;
 
   for (let i = 0; i < MAX_HEARTS; i++) {
     const filled = i < player.hearts;
@@ -536,9 +536,13 @@ function drawToast(ctx, viewW, viewH, elapsed) {
     ctx.textBaseline = 'top';
     ctx.fillText(toastText, viewW / 2, 72);
   } else {
-    ctx.font = '12px monospace';
+    ctx.font = '13px monospace';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(toastText, viewW / 2, viewH - (isTouch() ? 210 : 96));
+    // Derived from the buttons rather than a fixed offset: this line sits
+    // directly above them, so a change to their size or margin used to push
+    // them straight through it. Enlarging the row is exactly what did.
+    const above = isTouch() ? 210 : BUTTON_BOTTOM_MARGIN + buttonRadius() + 24;
+    ctx.fillText(toastText, viewW / 2, viewH - above);
   }
 
   ctx.restore();

@@ -135,13 +135,21 @@ let inMenu = true;
  * thing it describes, never after.
  */
 const TUTORIAL = [
-  [0, 'The city lost every colour. You are the last of it.'],
-  [230, 'Arrows to move. Up to jump.'],
-  [520, 'Enemies carry the stolen colours in their chest.'],
-  [700, 'A combo is TWO keys: Q W E picks the attack...'],
-  [900, '...then Q W E again picks blue, red or green.'],
-  [1180, 'Orange is red and green mixed. Try W then E.'],
-  [1430, 'The thief holds every colour. Hit only the lit one.'],
+  // [x to pass, text, lore?]
+  //
+  // The third field decides WHERE the line is drawn, and it is a real
+  // distinction rather than a style preference: lore is something the player
+  // stops and reads, so it goes large in the middle of the screen; an
+  // instruction is something they act on while playing, so it belongs down
+  // with the buttons it is describing, where their eyes already are.
+  [0, 'The city lost every colour. You are the last of it.', 1],
+  [200, 'Arrows to move. Up to jump.'],
+  [430, 'The thieves carry the stolen colours in their chest.', 1],
+  [640, 'A combo is TWO keys: the first picks the attack...'],
+  [840, '...the second picks blue, red or green.'],
+  [1120, 'Orange is red and green mixed. Try W then E.'],
+  [1330, 'Their leader holds every colour at once.', 1],
+  [1460, 'Only the lit colour can hurt it.'],
 ];
 
 /** Seconds each tutorial line stays up, fades included. */
@@ -336,9 +344,9 @@ function updateCoaching(dt, fired) {
   // Tutorial script: one line per frame at most, so two closely spaced triggers
   // cannot swallow each other.
   if (levelIndex === 0 && scriptLine < TUTORIAL.length) {
-    const [at, text] = TUTORIAL[scriptLine];
+    const [at, text, lore] = TUTORIAL[scriptLine];
     if (player.x >= at) {
-      showToast(text, elapsed, TUTORIAL_LINE_TIME, true);
+      showToast(text, elapsed, TUTORIAL_LINE_TIME, !!lore);
       scriptLine++;
       // Hold the idle hint off until the line has been read, so the two never
       // talk over each other in the one level where both are likely.
