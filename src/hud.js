@@ -183,7 +183,7 @@ function drawMarker(ctx, x, y, size, colorName, alpha, glow) {
 /** Which level this is, so progress through the game is legible at a glance. */
 function drawLevelBadge(ctx, viewW) {
   ctx.fillStyle = palette.hudDim;
-  ctx.font = '13px monospace';
+  ctx.font = '14px monospace';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.fillText(levelIndex + 1 + ' / ' + LEVEL_COUNT, viewW - 34, 28);
@@ -303,10 +303,10 @@ function drawUltimateButton(ctx, x, y, elapsed) {
   // Key cap.
   if (!isTouch()) {
     ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('R', 0, r + 16);
+    ctx.fillText('R', 0, r + 18);
   }
 
   ctx.restore();
@@ -384,10 +384,10 @@ function drawAbilityButton(ctx, x, y, key) {
   // Key cap.
   if (!isTouch()) {
     ctx.fillStyle = ready ? palette.hudText : palette.hudDim;
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(key.toUpperCase(), 0, r + 16);
+    ctx.fillText(key.toUpperCase(), 0, r + 18);
   }
 
   // There used to be a numeric countdown here. At the old 1.8s cooldown it was
@@ -536,7 +536,7 @@ function drawToast(ctx, viewW, viewH, elapsed) {
     ctx.textBaseline = 'top';
     ctx.fillText(toastText, viewW / 2, 72);
   } else {
-    ctx.font = '13px monospace';
+    ctx.font = '15px monospace';
     ctx.textBaseline = 'bottom';
     // Derived from the buttons rather than a fixed offset: this line sits
     // directly above them, so a change to their size or margin used to push

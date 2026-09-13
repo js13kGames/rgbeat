@@ -134,17 +134,30 @@ let inMenu = true;
  * runs still gets every line in order. Each line is placed just before the
  * thing it describes, never after.
  */
+/**
+ * The opening lore, played as a timed sequence rather than triggered by
+ * walking.
+ *
+ * Position is the right trigger for an instruction, which describes something
+ * in front of the player, but the wrong one for a story: it made the pacing of
+ * the fiction depend on how fast someone happened to walk, and a player who
+ * stood still never heard the rest of it. These play in order, each held long
+ * enough to read, before the level asks anything.
+ */
+const INTRO = [
+  'The city lost every colour. You are the last of it.',
+  'The thieves carry the stolen colours in their chest.',
+];
+
+/**
+ * Lines tied to a PLACE: the instructions, plus the one piece of lore that is
+ * genuinely about somewhere -- the leader, introduced at the arena door.
+ *
+ * [x to pass, text, lore?]. The third field decides where it is drawn: lore
+ * large and centred, instructions down with the controls they describe.
+ */
 const TUTORIAL = [
-  // [x to pass, text, lore?]
-  //
-  // The third field decides WHERE the line is drawn, and it is a real
-  // distinction rather than a style preference: lore is something the player
-  // stops and reads, so it goes large in the middle of the screen; an
-  // instruction is something they act on while playing, so it belongs down
-  // with the buttons it is describing, where their eyes already are.
-  [0, 'The city lost every colour. You are the last of it.', 1],
   [200, 'Arrows to move. Up to jump.'],
-  [430, 'The thieves carry the stolen colours in their chest.', 1],
   [640, 'A combo is TWO keys: the first picks the attack...'],
   [840, '...the second picks blue, red or green.'],
   [1120, 'Orange is red and green mixed. Try W then E.'],
@@ -152,11 +165,18 @@ const TUTORIAL = [
   [1460, 'Only the lit colour can hurt it.'],
 ];
 
-/** Seconds each tutorial line stays up, fades included. */
+/** Seconds an instruction stays up, fades included. */
 const TUTORIAL_LINE_TIME = 2;
+
+/** Lore is held longer: it is prose, and it is read rather than glanced at. */
+const LORE_LINE_TIME = 3.6;
 
 /** How far through TUTORIAL we are. Reset with the level. */
 let scriptLine = 0;
+
+/** How far through INTRO we are, and how long the current line has left. */
+let introLine = 0;
+let introTimer = 0;
 
 /** Seconds the player has given no input at all. */
 let idleTime = 0;
@@ -200,6 +220,8 @@ function beginGame() {
 function startLevel() {
   levelTransition = 0;
   scriptLine = 0;
+  introLine = 0;
+  introTimer = 0;
   levelKills = 0;
   wasEngaged = false;
   idleTime = 0;
@@ -341,16 +363,35 @@ function updateCoaching(dt, fired) {
     idleTime = -3;
   }
 
-  // Tutorial script: one line per frame at most, so two closely spaced triggers
-  // cannot swallow each other.
+  // The opening lore, on its own clock.
+  if (levelIndex === 0 && introLine < INTRO.length) {
+    introTimer -= dt;
+    if (introTimer <= 0) {
+      showToast(INTRO[introLine], elapsed, LORE_LINE_TIME, true);
+      introLine++;
+      introTimer = LORE_LINE_TIME;
+      idleTime = -LORE_LINE_TIME;
+    }
+    // Nothing positional fires underneath it: a player who walks off during
+    // the intro would otherwise stomp the story with a control hint.
+    return;
+  }
+
+  // Placed lines. The loop rather than a single check is what handles catching
+  // up after the intro: every trigger already behind the player is consumed,
+  // and only the last of them is spoken. Telling someone which key moves them
+  // when they are already halfway down the level is worse than saying nothing.
   if (levelIndex === 0 && scriptLine < TUTORIAL.length) {
-    const [at, text, lore] = TUTORIAL[scriptLine];
-    if (player.x >= at) {
-      showToast(text, elapsed, TUTORIAL_LINE_TIME, !!lore);
+    let line = null;
+    while (scriptLine < TUTORIAL.length && player.x >= TUTORIAL[scriptLine][0]) {
+      line = TUTORIAL[scriptLine];
       scriptLine++;
-      // Hold the idle hint off until the line has been read, so the two never
-      // talk over each other in the one level where both are likely.
-      idleTime = -TUTORIAL_LINE_TIME;
+    }
+
+    if (line) {
+      const seconds = line[2] ? LORE_LINE_TIME : TUTORIAL_LINE_TIME;
+      showToast(line[1], elapsed, seconds, !!line[2]);
+      idleTime = -seconds;
     }
   }
 
