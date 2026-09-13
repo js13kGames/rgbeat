@@ -53,6 +53,15 @@ export const JUMP_CUT_MULTIPLIER = 0.45;
 export const PLAYER_WIDTH = 34;
 export const PLAYER_HEIGHT = 40;
 
+/**
+ * Seconds of complete stillness before the game offers a hint.
+ *
+ * Long enough that it never fires during play -- a player mid-fight is always
+ * touching something -- and short enough that someone who has genuinely
+ * stopped, confused, is not left there.
+ */
+export const IDLE_HINT_DELAY = 3.5;
+
 // --- Camera -----------------------------------------------------------------
 /**
  * How much the world is magnified on screen.
@@ -174,11 +183,11 @@ export const EFFECT_LIFETIME = 0.32;
  * like, and shortening it to travel less would have made it snappier as well
  * as shorter, which is a different change. At 900px/s it crossed 465px --
  * nearly a third of the visible arena in one press, far enough that the player
- * routinely arrived somewhere they had not chosen. 630 covers about 70% of
- * that, which still outruns anything else in the game.
+ * routinely arrived somewhere they had not chosen. 560 covers about 60% of
+ * that -- still double a run, and still the fastest thing in the game.
  */
 export const DASH_DURATION = 0.5;
-export const DASH_SPEED = 630; // px/s -- 2.25x a normal run
+export const DASH_SPEED = 560; // px/s -- 2x a normal run
 export const DASH_IFRAME_TAIL = 0.2; // s of cover after the dash ends
 
 // The dash's reach IS the ground it covers.

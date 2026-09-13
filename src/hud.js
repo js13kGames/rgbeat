@@ -16,7 +16,7 @@
  */
 import { palette, rainbow, HIT_COLORS } from './palette.js';
 import { KEYS, cooldowns, cooldownProgress, combo, isArmed } from './combo.js';
-import { AIM_WINDOW, MAX_HEARTS, BOSS_MAX_HP } from './config.js';
+import { AIM_WINDOW, MAX_HEARTS } from './config.js';
 import { player } from './player.js';
 import { ultimate, isUltimateReady } from './ultimate.js';
 import { boss, bossActive, windowProgress } from './boss.js';
@@ -116,7 +116,11 @@ function drawBossBar(ctx, viewW) {
 
   // Remaining hits, as discrete pips rather than a continuous bar: the boss
   // takes a fixed number of correct reads, and pips say that plainly.
-  const pips = BOSS_MAX_HP;
+  //
+  // Sized to THIS boss, not to the global maximum. The tutorial's boss has
+  // three hit points, and drawing ten slots with three filled said it was
+  // already most of the way dead before the fight began.
+  const pips = boss.maxHp;
   const pipW = w / pips - 4;
   for (let i = 0; i < pips; i++) {
     const px = x + i * (pipW + 4);

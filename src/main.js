@@ -81,7 +81,7 @@ import { HIT_COLORS, loadPaletteMode, cyclePaletteMode } from './palette.js';
 import { drawHud, drawComboIndicator, showToast } from './hud.js';
 import { updateMenu, drawMenu, tapMenu } from './menu.js';
 import { initTouch, onTap } from './touch.js';
-import { BOSS_WIPE_DURATION, ZOOM } from './config.js';
+import { BOSS_WIPE_DURATION, IDLE_HINT_DELAY, ZOOM } from './config.js';
 
 /** Simulation step, in seconds. Fixed so physics stays deterministic. */
 const STEP = 1 / 60;
@@ -127,6 +127,40 @@ let wasArmed = false;
 let inMenu = true;
 
 /**
+ * The tutorial script: the x the player must pass, and what to say there.
+ *
+ * Positional rather than timed, so it is paced by the player instead of pacing
+ * them -- someone who stops to experiment is not talked over, and someone who
+ * runs still gets every line in order. Each line is placed just before the
+ * thing it describes, never after.
+ */
+const TUTORIAL = [
+  [0, 'The city lost every colour. You are the last of it.'],
+  [230, 'Arrows to move. Up to jump.'],
+  [520, 'Enemies carry the stolen colours in their chest.'],
+  [700, 'A combo is TWO keys: Q W E picks the attack...'],
+  [900, '...then Q W E again picks blue, red or green.'],
+  [1180, 'Orange is red and green mixed. Try W then E.'],
+  [1430, 'The thief holds every colour. Hit only the lit one.'],
+];
+
+/** How far through TUTORIAL we are. Reset with the level. */
+let scriptLine = 0;
+
+/** Seconds the player has given no input at all. */
+let idleTime = 0;
+
+/** Cleared once the player has done each thing, so we stop suggesting it. */
+let hasMoved = false;
+let hasFired = false;
+
+/** Enemies killed on this level, for the pacifist acknowledgement. */
+let levelKills = 0;
+
+/** Whether the boss fight had already begun last frame. */
+let wasEngaged = false;
+
+/**
  * Seconds until the next level loads, or 0 when not transitioning.
  *
  * The boss's death starts the restoration wipe, and the level must NOT change
@@ -154,6 +188,10 @@ function beginGame() {
 
 function startLevel() {
   levelTransition = 0;
+  scriptLine = 0;
+  levelKills = 0;
+  wasEngaged = false;
+  idleTime = 0;
   revivePlayer();
   resetCombo();
   resetUltimate();
@@ -180,6 +218,8 @@ function update(dt) {
   // The combo system runs first, because arming a combo takes the arrow keys
   // away from movement for the rest of this frame (GDD Section 3.1, step 2).
   const fired = updateCombo(dt, pressed, held, player.facing);
+
+  updateCoaching(dt, fired);
 
   // While aiming, movement intent is suppressed entirely -- the arrows are the
   // aim stick, and that includes jump.
@@ -257,6 +297,60 @@ function update(dt) {
   updateMusic();
 }
 
+/**
+ * Everything the game says to the player unprompted: the tutorial script, the
+ * idle nudges, and the pacifist acknowledgement.
+ *
+ * Kept in one place because all three write to the same toast, and spreading
+ * them through update() would mean three callers racing to overwrite each
+ * other with no single point that decides who wins.
+ */
+function updateCoaching(dt, fired) {
+  const moving = held.left || held.right || held.up;
+  if (moving) hasMoved = true;
+  if (fired) hasFired = true;
+
+  // Idle nudges. The timer resets on ANY input, including a key that did not
+  // produce a combo: someone pressing Q repeatedly is not idle, they are
+  // experimenting, and interrupting that to tell them how to move is worse
+  // than saying nothing.
+  const touching = moving || held.q || held.w || held.e || held.down;
+  idleTime = touching ? 0 : idleTime + dt;
+
+  if (idleTime > IDLE_HINT_DELAY) {
+    // Whichever thing they have not done yet. Movement first, because a player
+    // who has not moved cannot have reached an enemy to fight.
+    showToast(
+      hasMoved ? 'Use two-colour combinations to defeat enemies' : 'Use the arrows to move',
+      elapsed,
+      3
+    );
+    // Push the timer past the toast so the hint does not restate itself every
+    // frame the player stays still.
+    idleTime = -3;
+  }
+
+  // Tutorial script: one line per frame at most, so two closely spaced triggers
+  // cannot swallow each other.
+  if (levelIndex === 0 && scriptLine < TUTORIAL.length) {
+    const [at, text] = TUTORIAL[scriptLine];
+    if (player.x >= at) {
+      showToast(text, elapsed, 3.4);
+      scriptLine++;
+      idleTime = -3.4;
+    }
+  }
+
+  // Reaching a boss having killed nothing is a deliberate way to play, not an
+  // oversight, so it gets acknowledged rather than corrected. Fires on the
+  // frame the fight begins, which is the only moment the count is final.
+  const engaged = bossActive();
+  if (engaged && !wasEngaged && levelKills === 0) {
+    showToast('You reached the final boss in pacifist mode', elapsed, 4);
+  }
+  wasEngaged = engaged;
+}
+
 function onAbilityFired(ability) {
   spawnEffect(ability, player.x + player.w / 2, player.y + player.h / 2);
   sfxCast(HIT_COLORS.indexOf(ability.color), ability.archetype);
@@ -288,6 +382,8 @@ function onAbilityFired(ability) {
  * @param {boolean} viaUltimate whether the ultimate made the kill
  */
 function onEnemyKilled(enemy, exact, viaUltimate) {
+  levelKills++;
+
   if (__DEV__) {
     killLog.push({
       killedCore: enemy.core,

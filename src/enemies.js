@@ -42,6 +42,16 @@ import { restorationAmount, levelIndex } from './world.js';
  * `surface` is what they stand on; the spawn converts it to a body position.
  */
 const PLACEMENTS = [
+  // --- Tutorial: one of each kind of answer ---------------------------------
+  //
+  // A pure combo, then another, then one secondary. Three enemies is enough to
+  // show that the second key names a colour; a fourth would only repeat it.
+  [
+    { x: 430, surface: 640, core: RED, patrol: [380, 560] },
+    { x: 1000, surface: 640, core: BLUE, patrol: [950, 1140] },
+    { x: 1290, surface: 640, core: ORANGE, patrol: [1230, 1420] },
+  ],
+
   // --- Level 1: teach the grammar ------------------------------------------
   [
     // A single primary first, with room to experiment.

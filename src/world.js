@@ -47,6 +47,38 @@ import { inkRect, inkSpatter, mixColor, roundRect } from './render.js';
  * level after each boss attempt would be miserable in a jam game).
  */
 const LEVELS = [
+  // --- 0. Tutorial: the story, and the grammar, in about ninety seconds -----
+  //
+  // Deliberately short and deliberately safe. Its job is to get the player from
+  // "what are these keys" to "I can answer a colour", and a player who dies
+  // learning that will conclude the game is unfair rather than that they made a
+  // mistake. So: one gap, three enemies, and a boss with three hit points --
+  // enough to demonstrate that a boss cycles colours, not enough to be a test.
+  {
+    width: 2400,
+    height: 900,
+    killY: 1100,
+    spawn: { x: 100, y: 500 },
+    bossArenaX: 1500,
+    bossSpawn: { x: 1760, y: 640 },
+    // A demonstration, not a fight. Three windows is exactly enough to show
+    // that the exposed colour changes and that the ring predicts it.
+    bossHp: 3,
+    solids: [
+      { x: 0, y: 640, w: 700, h: 260 },
+      { x: 840, y: 640, w: 1560, h: 260 },
+
+      // One ledge before the gap, so the jump is practised somewhere harmless
+      // before it is required somewhere that costs a heart.
+      { x: 250, y: 545, w: 170, h: 24 },
+
+      // Arena footing, same shape as the real levels so nothing is a surprise.
+      { x: 1620, y: 545, w: 150, h: 24 },
+      { x: 1960, y: 470, w: 140, h: 24 },
+      { x: 2230, y: 545, w: 150, h: 24 },
+    ],
+  },
+
   // --- 1. Teaching ground: two pits, generous ledges ------------------------
   {
     width: 4300,
@@ -164,6 +196,15 @@ export const level = {};
 
 export function loadLevel(index) {
   levelIndex = index;
+
+  // Clear before assigning, not merge onto whatever was there.
+  //
+  // `level` is a single live object that every module imported once, so
+  // Object.assign alone leaves behind any key the incoming level does not
+  // define. The tutorial's `bossHp: 3` carried into all three real levels that
+  // way -- silently, because nothing reads a level field it does not expect.
+  // Any optional field added later would have hit the same trap.
+  for (const key in level) delete level[key];
   Object.assign(level, LEVELS[index]);
 }
 

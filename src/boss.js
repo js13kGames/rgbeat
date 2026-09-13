@@ -47,6 +47,8 @@ export const boss = {
   w: BOSS_WIDTH,
   h: BOSS_HEIGHT,
   hp: BOSS_MAX_HP,
+  /** The hp it spawned with, so the HUD can size its pip bar to THIS boss. */
+  maxHp: BOSS_MAX_HP,
   /** Colour currently exposed; only this one damages the boss. */
   weak: HIT_COLORS[0],
   /** Colour it will switch to, shown during the telegraph. */
@@ -100,7 +102,11 @@ export function spawnBoss() {
   bag = [];
   boss.x = level.bossSpawn.x;
   boss.y = level.bossSpawn.y - BOSS_HEIGHT;
-  boss.hp = BOSS_MAX_HP;
+  // Per-level, falling back to the default. The tutorial's boss is a
+  // demonstration rather than a test: it has to be survivable by someone who
+  // has known the combo grammar for ninety seconds.
+  boss.hp = level.bossHp || BOSS_MAX_HP;
+  boss.maxHp = boss.hp;
   boss.weak = drawFromBag();
   boss.next = drawFromBag();
   boss.timer = BOSS_WEAK_WINDOW;
