@@ -14,7 +14,9 @@
     "preview": "node tools/build.mjs --preview",
     "check:level": "node tools/check-level.mjs",
     "check:balance": "node tools/check-balance.mjs",
-    "check": "npm run check:level && npm run check:balance",
+    "check:combat": "node tools/check-combat.mjs",
+    "check": "npm run check:level && npm run check:balance && npm run check:combat",
+    "test": "npm run check",
     "encode:logo": "node tools/encode-logo.mjs"
   },
   "devDependencies": {

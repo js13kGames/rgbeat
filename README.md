@@ -121,8 +121,8 @@ This gets us the same class of result ECT/advzip would, with no native binary.
 
 [Roadroller](https://lifthrasiir.github.io/roadroller/) is **on by default**. It was held in
 reserve while there was slack — it makes the shipped output unreadable in devtools and adds
-~40s to a build — but at 94% of the budget with levels and art still to come, the reserve is
-what the project needs.
+~40s to a build — but once levels, art and the tutorial landed, the reserve became the only
+thing keeping the project inside the limit.
 
 | | zip | headroom |
 | --- | --- | --- |
@@ -137,7 +137,8 @@ better than deflate does.** Measured by adding two levels' worth of geometry and
 | Terser + deflate | +306 B |
 | Roadroller | **+98 B** |
 
-So content is close to free — roughly 50–150 B per level rather than ~250 B. Budget planning
+So content is close to free — roughly 50–150 B per level rather than ~250 B. That is what made
+a fourth level (the tutorial) affordable late in development. Budget planning
 should use the Roadroller figure; `build:fast` reports a pessimistic upper bound, useful for
 quick iteration but not the number that ships.
 
@@ -172,12 +173,13 @@ These are non-negotiable and apply to every change:
 - **Zero external resources.** No CDN scripts, no remote fonts, no analytics, no network calls of
   any kind. All graphics and audio are generated procedurally at runtime (GDD Sections 8–9).
 - **Zero `console.error`** on current Chrome and Firefox, fully playable.
-  > **Testing status:** verified continuously in Chromium. **Firefox has not been
-  > run** — it is not installed on the development machine. Every browser API used
-  > is long-supported there, and the Web Audio calls avoid the one real Firefox
-  > divergence (`exponentialRampToValueAtTime` throws on a zero target or a ramp
-  > from zero; every ramp here is floored at `0.0001`). That is a static argument,
-  > not a test. **Run it in Firefox before submitting.**
+  > **Testing status:** verified continuously in Chromium, and confirmed working in
+  > Firefox. The one real Firefox divergence was hit and fixed during development:
+  > `exponentialRampToValueAtTime` throws on a zero target or a ramp from zero, so
+  > every ramp in `audio.js` is floored at `0.0001`.
+  >
+  > **Touch is still only verified under device emulation**, not on a physical
+  > phone. That one is open.
 - **No build step after unzipping** — a plain `index.html` at the zip root that just works.
 - **Readable source in the repo.** This repo is cloned by the js13kGames organization as a
   community learning resource, so `src/` stays modular and unminified.
@@ -195,7 +197,7 @@ src/              readable game source (ES modules), the thing humans edit
   config.js       every tunable value, in one place
   palette.js      the central palette + colourblind modes (Sections 9–10)
   render.js       shared ink helpers and the per-colour glyphs
-  world.js        the three levels, collision, ink-wash renderer, restoration
+  world.js        the four levels (tutorial + three), collision, renderer, restoration
   player.js       platformer physics, health, procedural unicorn
   camera.js       follow camera and screen shake
   input.js        keyboard state
@@ -226,12 +228,12 @@ dist-dev/         dev server output (gitignored)
 
 ## Verification
 
-Two design constraints in the GDD are stated as hard requirements, and both are
-too easy to get wrong by eye — so each has a script that proves it rather than
-asserting it. Both are dev-only and cost nothing in the shipped zip.
+Three things in this game are too easy to get wrong by eye, so each has a script
+that proves it rather than asserting it. All three are dev-only and cost nothing
+in the shipped zip.
 
 ```bash
-npm run check
+npm test          # or: npm run check
 ```
 
 - **`check:level`** runs the *real* physics integrator from `src/player.js` and
@@ -245,6 +247,17 @@ npm run check
   is not obvious by inspection — it is a *secondary* colour whose two keys both
   went cold moments earlier — so the script derives required keys from the real
   combo table and simulates entire fights. It covers volatile enemy windows too.
+- **`check:combat`** covers what the other two do not: what an ability actually
+  *does* to the player and the world. Every case in it was a real bug at some
+  point — a dash that crossed a third of the arena, shockwaves that outlived the
+  boss and kept hurting the player while invisible, two archetypes competing to
+  displace the player, boss hits that charged no ultimate. None of that shows up
+  in a screenshot, and the browser turned out to be an actively misleading place
+  to look for it: a preview pane that stops compositing freezes
+  `requestAnimationFrame` without saying so, and a frozen game is
+  indistinguishable from a broken one. Twice during development that cost hours
+  chasing bugs that did not exist. Running the real modules headlessly gives the
+  same answer every time.
 
 `docs/reference/` holds painterly concept art used only to pin down palette, silhouette and HUD
 mood. It is deliberately **not** shippable: all in-game visuals are procedural Canvas 2D shapes

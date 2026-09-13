@@ -379,6 +379,21 @@ function drawAbilityButton(ctx, x, y, key) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   archetypeIcon(ctx, key, r * 0.5);
+
+  // The key's COLOUR, as its glyph, small and above the icon.
+  //
+  // The button teaches the archetype -- what pressing this first does -- but
+  // the second press names a colour, and that half went missing when the
+  // archetype icons arrived. The ring is already tinted, so the association
+  // survives for anyone who can read the hue; this is the Section 10 half, the
+  // redundancy for a player who cannot. It is the same glyph they will see on
+  // every enemy core, which is the whole point of it being a shape.
+  ctx.save();
+  ctx.translate(0, -r * 0.6);
+  drawGlyph(ctx, HIT_COLORS.indexOf(KEY_COLOR[key]), 7);
+  ctx.fill();
+  ctx.restore();
+
   ctx.globalAlpha = 1;
 
   // Key cap.
